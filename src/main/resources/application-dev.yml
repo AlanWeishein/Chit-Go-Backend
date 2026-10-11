@@ -1,0 +1,5 @@
+# Perfil dev: además de las migraciones, carga los datos de prueba de db/dev
+# (local, mesas con QR, mozos con sus mesas, turnos y carta).
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev

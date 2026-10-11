@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: chit-go-back
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/chitgo}
+    username: ${DB_USER:chitgo}
+    password: ${DB_PASSWORD:chitgo}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+
+server:
+  port: 8080
