@@ -19,8 +19,11 @@ El dominio no depende de Spring, JPA ni WebSocket. Los controladores no tienen l
 
 ## Cómo correrlo
 
-1. Levantar MySQL (Docker Compose del grupo). Variables: `DB_URL`, `DB_USER`, `DB_PASSWORD`
-   (por defecto `jdbc:mysql://localhost:3306/chitgo`, usuario y clave `chitgo`).
+1. Levantar MySQL con Docker: `docker compose up -d` (MySQL 8.4 en el puerto 3307, para no chocar con un MySQL instalado).
+   Esperar a que `docker compose ps` lo muestre `healthy`. Si no hay `.env`, usa los valores
+   por defecto de `.env.example`. Variables del back: `DB_URL`, `DB_USER`, `DB_PASSWORD`
+   (por defecto `jdbc:mysql://localhost:3307/chitgo`, usuario y clave `chitgo`).
+   Para bajarlo: `docker compose down` (con `-v` borra también los datos).
 2. `mvn spring-boot:run -Dspring-boot.run.profiles=dev`
 3. Probar: `GET http://localhost:8080/api/v1/ping`
 
