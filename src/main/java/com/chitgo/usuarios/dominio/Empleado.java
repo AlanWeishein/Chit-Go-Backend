@@ -4,16 +4,16 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-import jakarta.persistence.CollectionTable;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
@@ -32,10 +32,8 @@ public class Empleado {
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     private Usuario usuario;
 
-    @ElementCollection
-    @CollectionTable(name = "mozo_mesa", joinColumns = @JoinColumn(name = "empleado_id"))
-    @Column(name = "mesa_id")
-    private Set<Long> mesaIds = new HashSet<>();
+    @OneToMany(mappedBy = "empleado", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<MozoMesa> mesasAsignadas = new HashSet<>();
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -47,6 +45,11 @@ public class Empleado {
     public Empleado(Long localId, Usuario usuario) {
         this.localId = localId;
         this.usuario = usuario;
+    }
+
+    /** Solo arma la relación: lo llama el constructor de MozoMesa. */
+    void asignarMesa(MozoMesa mozoMesa) {
+        mesasAsignadas.add(mozoMesa);
     }
 
     public Long getId() {
@@ -61,8 +64,12 @@ public class Empleado {
         return usuario;
     }
 
+    public Set<MozoMesa> getMesasAsignadas() {
+        return Collections.unmodifiableSet(mesasAsignadas);
+    }
+
     public Set<Long> getMesaIds() {
-        return Collections.unmodifiableSet(mesaIds);
+        return mesasAsignadas.stream().map(MozoMesa::getMesaId).collect(Collectors.toUnmodifiableSet());
     }
 
     public Instant getCreadoEn() {
