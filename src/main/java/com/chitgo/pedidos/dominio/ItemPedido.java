@@ -20,6 +20,8 @@ public class ItemPedido {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long localId;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     private Pedido pedido;
 
@@ -35,7 +37,8 @@ public class ItemPedido {
     protected ItemPedido() {
     }
 
-    public ItemPedido(Pedido pedido, Long platoId, short cantidad, BigDecimal precioUnitario, String observacion) {
+    public ItemPedido(Long localId, Pedido pedido, Long platoId, short cantidad, BigDecimal precioUnitario, String observacion) {
+        this.localId = localId;
         this.pedido = pedido;
         this.platoId = platoId;
         this.cantidad = cantidad;
@@ -46,6 +49,10 @@ public class ItemPedido {
 
     public Long getId() {
         return id;
+    }
+
+    public Long getLocalId() {
+        return localId;
     }
 
     public Pedido getPedido() {

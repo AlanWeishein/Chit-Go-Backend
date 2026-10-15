@@ -5,17 +5,17 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -46,11 +46,8 @@ public class Plato {
 
     private boolean activo = true;
 
-    @ManyToMany
-    @JoinTable(name = "plato_etiqueta",
-            joinColumns = @JoinColumn(name = "plato_id"),
-            inverseJoinColumns = @JoinColumn(name = "etiqueta_id"))
-    private Set<Etiqueta> etiquetas = new HashSet<>();
+    @OneToMany(mappedBy = "plato", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<PlatoEtiqueta> platoEtiquetas = new HashSet<>();
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -66,6 +63,11 @@ public class Plato {
         this.descripcion = descripcion;
         this.precio = precio;
         this.imagenUrl = imagenUrl;
+    }
+
+    /** Solo arma la relación: lo llama el constructor de PlatoEtiqueta. */
+    void agregarEtiqueta(PlatoEtiqueta platoEtiqueta) {
+        platoEtiquetas.add(platoEtiqueta);
     }
 
     public Long getId() {
@@ -104,8 +106,12 @@ public class Plato {
         return activo;
     }
 
+    public Set<PlatoEtiqueta> getPlatoEtiquetas() {
+        return Collections.unmodifiableSet(platoEtiquetas);
+    }
+
     public Set<Etiqueta> getEtiquetas() {
-        return Collections.unmodifiableSet(etiquetas);
+        return platoEtiquetas.stream().map(PlatoEtiqueta::getEtiqueta).collect(Collectors.toUnmodifiableSet());
     }
 
     public Instant getCreadoEn() {
