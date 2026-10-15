@@ -12,6 +12,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.chitgo.auditoria.dominio.RegistroAuditoria;
@@ -40,8 +41,10 @@ import com.chitgo.usuarios.dominio.Usuario;
 /**
  * Inserta un local con todas sus tablas y lo vuelve a leer desde la base.
  * Corre contra el MySQL del Compose (tiene que estar levantado) y hace rollback al final.
+ * Con el perfil dev, porque si la base ya tiene la seed aplicada, sin db/dev Flyway no valida.
  */
 @SpringBootTest
+@ActiveProfiles("dev")
 @Transactional
 class GrafoCompletoPersistenciaTest {
 
