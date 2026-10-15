@@ -60,10 +60,24 @@ turno todos los días de 00:00 a 23:59. No se cargan cuentas, pedidos, avisos, a
 ausencias: los crea cada caso de prueba. Los tokens de los QR (mesas y staff) están en el
 encabezado del SQL.
 
+## Sesión y CSRF (para el front)
+
+- La sesión del personal es un JWT en la cookie `chitgo_sesion` (HttpOnly, SameSite=Strict). El front
+  no la puede leer: para saber quién está logueado llama a `GET /api/v1/auth/sesion`, que da 401 si no hay
+  sesión.
+- Públicas: `/api/v1/ping`, `/api/v1/public/**` y los `POST` de login (`/auth/pin`, `/auth/mozo/login`,
+  `/auth/admin/login`). Todo lo demás pide la cookie.
+- CSRF: cualquier respuesta deja la cookie `XSRF-TOKEN`, que sí se lee desde JavaScript. Todo `POST`,
+  `PUT`, `PATCH` y `DELETE` tiene que mandar su valor en el header `X-XSRF-TOKEN`, también los logins.
+  Sin el header, o con otro valor, responde 403. Va en un solo lugar: `compartido/api`.
+- Los errores salen en ProblemDetail (`application/problem+json`).
+- Con el perfil `dev` las cookies van sin `Secure`, para probar por http desde el celular con la IP de
+  la compu. Fuera de dev, `COOKIE_SEGURA=false` hace lo mismo.
+
 ## Ramas
 
 `main` estable, `develop` en desarrollo, `feature/...` por tarea. PR a `develop`, lo revisa otro.
 
 ## Pendiente
 
-- `SecurityConfig` es temporal (permite todo). Reemplazar por JWT en cookie HttpOnly, permisos y CSRF.
+- Permisos por endpoint contra `rol_permiso` (hoy alcanza con estar logueado).
