@@ -14,3 +14,9 @@ spring:
 
 server:
   port: 8080
+
+chitgo:
+  jwt:
+    # Clave para firmar el JWT de la sesión, en Base64 (32 bytes o más). Sin valor por defecto a
+    # propósito: si falta, el back usa una clave al azar y avisa en el log (ver .env.example).
+    clave: ${JWT_CLAVE:}
