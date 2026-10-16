@@ -1,6 +1,5 @@
 package com.chitgo.usuarios.aplicacion;
 
-import java.time.Duration;
 import java.time.Instant;
 
 import org.springframework.stereotype.Service;
@@ -8,15 +7,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.Reloj;
-import com.chitgo.usuarios.aplicacion.dto.SesionDto;
-import com.chitgo.usuarios.aplicacion.dto.SesionDto.LocalDeSesionDto;
-import com.chitgo.usuarios.dominio.DatosDeSesion;
 import com.chitgo.usuarios.dominio.Local;
 import com.chitgo.usuarios.dominio.PinIncorrectoException;
 import com.chitgo.usuarios.dominio.Usuario;
 import com.chitgo.usuarios.dominio.UsuarioBloqueadoException;
 import com.chitgo.usuarios.dominio.puertos.CodificadorDeClaves;
-import com.chitgo.usuarios.dominio.puertos.EmisorDeTokens;
 import com.chitgo.usuarios.dominio.puertos.LocalRepository;
 import com.chitgo.usuarios.dominio.puertos.UsuarioRepository;
 
@@ -29,15 +24,15 @@ public class IngresarConPinService {
     private final LocalRepository locales;
     private final UsuarioRepository usuarios;
     private final CodificadorDeClaves codificador;
-    private final EmisorDeTokens emisor;
+    private final AperturaDeSesion apertura;
     private final Reloj reloj;
 
-    public IngresarConPinService(LocalRepository locales, UsuarioRepository usuarios, CodificadorDeClaves codificador,
-            EmisorDeTokens emisor, Reloj reloj) {
+    IngresarConPinService(LocalRepository locales, UsuarioRepository usuarios, CodificadorDeClaves codificador,
+            AperturaDeSesion apertura, Reloj reloj) {
         this.locales = locales;
         this.usuarios = usuarios;
         this.codificador = codificador;
-        this.emisor = emisor;
+        this.apertura = apertura;
         this.reloj = reloj;
     }
 
@@ -77,17 +72,6 @@ public class IngresarConPinService {
             throw new PinIncorrectoException();
         }
         usuario.registrarIngreso();
-
-        // Tarea 7: T según el rol (Caja, 60 minutos). Por ahora, el del local para todos.
-        Duration duracion = Duration.ofMinutes(local.getMinutosInactividadSesion());
-        DatosDeSesion datos = new DatosDeSesion(usuario.getId(), usuario.getRol().getCodigo(), local.getId(),
-                usuario.isDebeCambiarCredencial());
-        String token = emisor.emitir(datos, duracion);
-
-        // El vencimiento tal como quedó en el token (en segundos), el mismo que va a dar /auth/sesion.
-        Instant expiraEn = emisor.leer(token).expiraEn();
-        SesionDto sesion = new SesionDto(usuario.getId(), usuario.getNombre(), datos.rol(),
-                new LocalDeSesionDto(local.getId(), local.getNombre()), datos.debeCambiarCredencial(), expiraEn);
-        return new ResultadoDeIngreso(token, duracion, sesion);
+        return apertura.abrir(usuario, local);
     }
 }

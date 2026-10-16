@@ -18,5 +18,9 @@ interface UsuarioJpaRepository extends JpaRepository<Usuario, Long> {
     @Query("SELECT u FROM Usuario u WHERE u.id = :id")
     Optional<Usuario> buscarConBloqueo(@Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM Usuario u WHERE u.email = :email")
+    Optional<Usuario> buscarPorEmailConBloqueo(@Param("email") String email);
+
     List<Usuario> findByLocalIdAndActivoTrueAndRolCodigoInOrderByNombreAsc(Long localId, Collection<String> codigos);
 }

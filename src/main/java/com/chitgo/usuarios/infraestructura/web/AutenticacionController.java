@@ -11,8 +11,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chitgo.usuarios.aplicacion.ConsultarSesionService;
+import com.chitgo.usuarios.aplicacion.IngresarConEmailService;
 import com.chitgo.usuarios.aplicacion.IngresarConPinService;
 import com.chitgo.usuarios.aplicacion.ResultadoDeIngreso;
+import com.chitgo.usuarios.aplicacion.dto.IngresoConEmailDto;
 import com.chitgo.usuarios.aplicacion.dto.IngresoConPinDto;
 import com.chitgo.usuarios.aplicacion.dto.SesionDto;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
@@ -24,12 +26,14 @@ public class AutenticacionController {
 
     private final ConsultarSesionService consultarSesion;
     private final IngresarConPinService ingresarConPin;
+    private final IngresarConEmailService ingresarConEmail;
     private final CookieDeSesion cookieDeSesion;
 
     public AutenticacionController(ConsultarSesionService consultarSesion, IngresarConPinService ingresarConPin,
-            CookieDeSesion cookieDeSesion) {
+            IngresarConEmailService ingresarConEmail, CookieDeSesion cookieDeSesion) {
         this.consultarSesion = consultarSesion;
         this.ingresarConPin = ingresarConPin;
+        this.ingresarConEmail = ingresarConEmail;
         this.cookieDeSesion = cookieDeSesion;
     }
 
@@ -37,9 +41,13 @@ public class AutenticacionController {
     @PostMapping("/pin")
     public ResponseEntity<SesionDto> pin(@Valid @RequestBody IngresoConPinDto pedido) {
         ResultadoDeIngreso resultado = ingresarConPin.ingresar(pedido.tokenStaff(), pedido.usuarioId(), pedido.pin());
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookieDeSesion.crear(resultado.token(), resultado.duracion()).toString())
-                .body(resultado.sesion());
+        return conCookie(resultado);
+    }
+
+    /** Admin y Gerente/Dueño (P-12). Como el de PIN: deja la cookie y devuelve lo mismo que /auth/sesion. */
+    @PostMapping("/admin/login")
+    public ResponseEntity<SesionDto> adminLogin(@Valid @RequestBody IngresoConEmailDto pedido) {
+        return conCookie(ingresarConEmail.ingresar(pedido.email(), pedido.password()));
     }
 
     /** No deja una cookie nueva: consultar la sesión no la renueva. */
@@ -54,5 +62,11 @@ public class AutenticacionController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cookieDeSesion.borrar().toString())
                 .build();
+    }
+
+    private ResponseEntity<SesionDto> conCookie(ResultadoDeIngreso resultado) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookieDeSesion.crear(resultado.token(), resultado.duracion()).toString())
+                .body(resultado.sesion());
     }
 }

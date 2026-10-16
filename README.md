@@ -88,6 +88,17 @@ encabezado del SQL.
     PIN. No suma intentos.
   - 400: falta un dato o el PIN no tiene de 4 a 10 dígitos. No suma intentos.
 
+### Login con email (Admin y Gerente/Dueño)
+
+- `POST /api/v1/auth/admin/login` con `{email, password}`. El email no distingue mayúsculas. Si entra,
+  deja la cookie de sesión y responde 200 con lo mismo que `/auth/sesion`; el Gerente/Dueño viene con
+  `local: null`. Si no:
+  - 401 "Email o contraseña incorrectos", siempre el mismo: el email no existe, la contraseña está mal, o
+    el usuario está bloqueado o dado de baja. Acá no hay 423. La contraseña mal suma un intento, y al
+    quinto seguido queda bloqueado (lo destraba el Gerente/Dueño).
+  - 400: falta un dato, o la contraseña no tiene de 8 a 64 caracteres o pasa de 72 bytes (con acentos o
+    emojis cada carácter ocupa más de uno). No suma intentos.
+
 ## Fechas
 
 La conexión a MySQL va en UTC (`connectionTimeZone` en `application.yml`), igual que los `Instant` de

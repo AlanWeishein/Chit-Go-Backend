@@ -5,6 +5,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.chitgo.usuarios.dominio.CredencialesIncorrectasException;
 import com.chitgo.usuarios.dominio.PinIncorrectoException;
 import com.chitgo.usuarios.dominio.UsuarioBloqueadoException;
 
@@ -23,5 +24,11 @@ class ErroresDeIngreso {
     @ExceptionHandler(UsuarioBloqueadoException.class)
     ProblemDetail bloqueado(UsuarioBloqueadoException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.LOCKED, e.getMessage());
+    }
+
+    /** Login con email: también el bloqueado da 401, no 423. */
+    @ExceptionHandler(CredencialesIncorrectasException.class)
+    ProblemDetail credencialesIncorrectas(CredencialesIncorrectasException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
     }
 }

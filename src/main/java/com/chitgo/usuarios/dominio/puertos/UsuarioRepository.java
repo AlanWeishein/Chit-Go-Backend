@@ -17,6 +17,9 @@ public interface UsuarioRepository {
      */
     Optional<Usuario> buscarPorIdParaIngreso(Long id);
 
+    /** El email es único en toda la base. También con la fila bloqueada, por el mismo motivo. */
+    Optional<Usuario> buscarPorEmailParaIngreso(String email);
+
     /** Los activos del local con alguno de esos roles, ordenados por nombre. */
     List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol);
 }
