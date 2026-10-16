@@ -3,3 +3,8 @@
 spring:
   flyway:
     locations: classpath:db/migration,classpath:db/dev
+
+# Cookies sin Secure, para probar por http (por ejemplo desde el celular, con la IP de la compu).
+chitgo:
+  sesion:
+    cookie-segura: false

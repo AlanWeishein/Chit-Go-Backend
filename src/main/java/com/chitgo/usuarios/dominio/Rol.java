@@ -18,6 +18,9 @@ import jakarta.persistence.Table;
 @Table(name = "rol")
 public class Rol {
 
+    /** Los que entran con PIN desde la lista del QR de staff (RF-32). */
+    public static final Set<String> CODIGOS_CON_PIN = Set.of("MOZO", "CAJA", "COCINA");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -54,5 +57,9 @@ public class Rol {
 
     public Set<Permiso> getPermisos() {
         return Collections.unmodifiableSet(permisos);
+    }
+
+    public boolean entraConPin() {
+        return CODIGOS_CON_PIN.contains(codigo);
     }
 }

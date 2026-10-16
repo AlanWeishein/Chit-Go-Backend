@@ -22,7 +22,9 @@ El dominio no depende de Spring, JPA ni WebSocket. Los controladores no tienen l
 1. Levantar MySQL con Docker: `docker compose up -d` (MySQL 8.4 en el puerto 3307, para no chocar con un MySQL instalado).
    Esperar a que `docker compose ps` lo muestre `healthy`. Si no hay `.env`, usa los valores
    por defecto de `.env.example`. Variables del back: `DB_URL`, `DB_USER`, `DB_PASSWORD`
-   (por defecto `jdbc:mysql://localhost:3307/chitgo`, usuario y clave `chitgo`).
+   (por defecto `jdbc:mysql://localhost:3307/chitgo`, usuario y clave `chitgo`) y `JWT_CLAVE`, la
+   clave para firmar la sesión (sin valor por defecto; si falta, el back usa una al azar y lo avisa
+   en el log, ver `.env.example`).
    Para bajarlo: `docker compose down` (con `-v` borra también los datos).
 2. `mvn spring-boot:run -Dspring-boot.run.profiles=dev`
 3. Probar: `GET http://localhost:8080/api/v1/ping`
@@ -58,10 +60,43 @@ turno todos los días de 00:00 a 23:59. No se cargan cuentas, pedidos, avisos, a
 ausencias: los crea cada caso de prueba. Los tokens de los QR (mesas y staff) están en el
 encabezado del SQL.
 
+## Sesión y CSRF (para el front)
+
+- La sesión del personal es un JWT en la cookie `chitgo_sesion` (HttpOnly, SameSite=Strict). El front
+  no la puede leer: para saber quién está logueado llama a `GET /api/v1/auth/sesion`, que da 401 si no hay
+  sesión.
+- Públicas: `/api/v1/ping`, `/api/v1/public/**` y los `POST` de login (`/auth/pin`, `/auth/mozo/login`,
+  `/auth/admin/login`). Todo lo demás pide la cookie.
+- CSRF: cualquier respuesta deja la cookie `XSRF-TOKEN`, que sí se lee desde JavaScript. Todo `POST`,
+  `PUT`, `PATCH` y `DELETE` tiene que mandar su valor en el header `X-XSRF-TOKEN`, también los logins.
+  Sin el header, o con otro valor, responde 403. Va en un solo lugar: `compartido/api`.
+- Los errores salen en ProblemDetail (`application/problem+json`).
+- Con el perfil `dev` las cookies van sin `Secure`, para probar por http desde el celular con la IP de
+  la compu. Fuera de dev, `COOKIE_SEGURA=false` hace lo mismo.
+
+### Login con PIN (Mozo, Caja y Cocina)
+
+- `GET /api/v1/public/staff/{tokenStaff}` devuelve `{nombreLocal, usuarios: [{id, nombre}]}`: los activos
+  del local que entran con PIN, ordenados por nombre. Un token que no existe da 404 con
+  "El QR de staff no es válido.", sin datos de ningún local.
+- `POST /api/v1/auth/pin` con `{tokenStaff, usuarioId, pin}` (PIN de 4 a 10 dígitos). Si entra, deja la
+  cookie de sesión y responde 200 con lo mismo que `/auth/sesion`. Si no:
+  - 401 "PIN incorrecto": suma un intento fallido.
+  - 423 "Tu usuario está bloqueado. Pedile al Admin que te blanquee el PIN.": al quinto intento fallido
+    seguido, y desde ahí también con el PIN correcto. No vence solo.
+  - 404: el token de staff no existe, o el usuario no es de ese local, está dado de baja o no entra con
+    PIN. No suma intentos.
+  - 400: falta un dato o el PIN no tiene de 4 a 10 dígitos. No suma intentos.
+
+## Fechas
+
+La conexión a MySQL va en UTC (`connectionTimeZone` en `application.yml`), igual que los `Instant` de
+Java. Al mirar la base a mano, las columnas `TIMESTAMP` se ven en la zona de tu sesión de MySQL.
+
 ## Ramas
 
 `main` estable, `develop` en desarrollo, `feature/...` por tarea. PR a `develop`, lo revisa otro.
 
 ## Pendiente
 
-- `SecurityConfig` es temporal (permite todo). Reemplazar por JWT en cookie HttpOnly, permisos y CSRF.
+- Permisos por endpoint contra `rol_permiso` (hoy alcanza con estar logueado).
