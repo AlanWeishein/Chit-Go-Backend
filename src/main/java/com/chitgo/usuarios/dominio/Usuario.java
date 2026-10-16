@@ -19,6 +19,16 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "usuario")
 public class Usuario {
 
+    /** RNF-07: a los 5 intentos fallidos seguidos queda bloqueado. */
+    public static final int INTENTOS_PARA_BLOQUEAR = 5;
+
+    /**
+     * El bloqueo por intentos no vence solo: dura hasta que el Admin blanquea el PIN (HU-14), que pone
+     * bloqueadoHasta en NULL. Como la columna es "hasta", se guarda una fecha que no llega nunca. Es 2038
+     * porque un TIMESTAMP de MySQL no pasa del 2038-01-19.
+     */
+    public static final Instant BLOQUEO_SIN_VENCIMIENTO = Instant.parse("2038-01-01T00:00:00Z");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -114,5 +124,23 @@ public class Usuario {
 
     public Instant getCreadoEn() {
         return creadoEn;
+    }
+
+    public boolean estaBloqueado(Instant ahora) {
+        return bloqueadoHasta != null && ahora.isBefore(bloqueadoHasta);
+    }
+
+    /** Un intento fallido más. Al quinto seguido queda bloqueado sin vencimiento. */
+    public void registrarIntentoFallido() {
+        intentosFallidos++;
+        if (intentosFallidos >= INTENTOS_PARA_BLOQUEAR) {
+            bloqueadoHasta = BLOQUEO_SIN_VENCIMIENTO;
+        }
+    }
+
+    /** Entró con la credencial correcta: los intentos vuelven a 0. */
+    public void registrarIngreso() {
+        intentosFallidos = 0;
+        bloqueadoHasta = null;
     }
 }

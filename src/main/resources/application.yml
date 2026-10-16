@@ -5,6 +5,13 @@ spring:
     url: ${DB_URL:jdbc:mysql://localhost:3307/chitgo}
     username: ${DB_USER:chitgo}
     password: ${DB_PASSWORD:chitgo}
+    # La sesión de MySQL en UTC, como escribe Hibernate los Instant. Si no, con el MySQL en -03 todo lo que
+    # guarda JPA queda 3 horas corrido respecto de CURRENT_TIMESTAMP. Va acá y no en la URL para que valga
+    # también con otro DB_URL.
+    hikari:
+      data-source-properties:
+        connectionTimeZone: UTC
+        forceConnectionTimeZoneToSession: true
   jpa:
     open-in-view: false
     hibernate:

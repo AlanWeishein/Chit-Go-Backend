@@ -1,5 +1,7 @@
 package com.chitgo.usuarios.infraestructura.persistencia;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
@@ -19,5 +21,15 @@ class UsuarioRepositoryAdapter implements UsuarioRepository {
     @Override
     public Optional<Usuario> buscarPorId(Long id) {
         return jpa.findById(id);
+    }
+
+    @Override
+    public Optional<Usuario> buscarPorIdParaIngreso(Long id) {
+        return jpa.buscarConBloqueo(id);
+    }
+
+    @Override
+    public List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol) {
+        return jpa.findByLocalIdAndActivoTrueAndRolCodigoInOrderByNombreAsc(localId, codigosDeRol);
     }
 }

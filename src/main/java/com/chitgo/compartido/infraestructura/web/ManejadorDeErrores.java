@@ -2,11 +2,14 @@ package com.chitgo.compartido.infraestructura.web;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.SinSesionException;
 
 /**
@@ -18,6 +21,7 @@ public class ManejadorDeErrores {
 
     static final String SIN_SESION = "No hay una sesión iniciada, o venció.";
     static final String SIN_PERMISO = "No tenés permiso para hacer esto.";
+    static final String DATOS_INVALIDOS = "Los datos enviados no son válidos.";
 
     @ExceptionHandler(AuthenticationException.class)
     ProblemDetail sinAutenticar(AuthenticationException e) {
@@ -33,5 +37,16 @@ public class ManejadorDeErrores {
     @ExceptionHandler(AccessDeniedException.class)
     ProblemDetail sinPermiso(AccessDeniedException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, SIN_PERMISO);
+    }
+
+    @ExceptionHandler(NoEncontradoException.class)
+    ProblemDetail noEncontrado(NoEncontradoException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    /** Un campo que falta o no tiene el formato (un PIN con letras), o un cuerpo que no es JSON. */
+    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
+    ProblemDetail datosInvalidos(Exception e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, DATOS_INVALIDOS);
     }
 }

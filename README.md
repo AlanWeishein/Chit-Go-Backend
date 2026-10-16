@@ -74,6 +74,25 @@ encabezado del SQL.
 - Con el perfil `dev` las cookies van sin `Secure`, para probar por http desde el celular con la IP de
   la compu. Fuera de dev, `COOKIE_SEGURA=false` hace lo mismo.
 
+### Login con PIN (Mozo, Caja y Cocina)
+
+- `GET /api/v1/public/staff/{tokenStaff}` devuelve `{nombreLocal, usuarios: [{id, nombre}]}`: los activos
+  del local que entran con PIN, ordenados por nombre. Un token que no existe da 404 con
+  "El QR de staff no es válido.", sin datos de ningún local.
+- `POST /api/v1/auth/pin` con `{tokenStaff, usuarioId, pin}` (PIN de 4 a 10 dígitos). Si entra, deja la
+  cookie de sesión y responde 200 con lo mismo que `/auth/sesion`. Si no:
+  - 401 "PIN incorrecto": suma un intento fallido.
+  - 423 "Tu usuario está bloqueado. Pedile al Admin que te blanquee el PIN.": al quinto intento fallido
+    seguido, y desde ahí también con el PIN correcto. No vence solo.
+  - 404: el token de staff no existe, o el usuario no es de ese local, está dado de baja o no entra con
+    PIN. No suma intentos.
+  - 400: falta un dato o el PIN no tiene de 4 a 10 dígitos. No suma intentos.
+
+## Fechas
+
+La conexión a MySQL va en UTC (`connectionTimeZone` en `application.yml`), igual que los `Instant` de
+Java. Al mirar la base a mano, las columnas `TIMESTAMP` se ven en la zona de tu sesión de MySQL.
+
 ## Ramas
 
 `main` estable, `develop` en desarrollo, `feature/...` por tarea. PR a `develop`, lo revisa otro.
