@@ -86,9 +86,11 @@ public class EmisorDeTokensJwt implements EmisorDeTokens {
         }
     }
 
-    private static SecretKey armarClave(String claveBase64) {
+    /** También la usa EmisorDeHabilitacionesJwt, para la cookie de dispositivo del mozo. */
+    static SecretKey armarClave(String claveBase64) {
         if (claveBase64 == null || claveBase64.isBlank()) {
-            log.warn("JWT_CLAVE no está definida: se usa una clave al azar y las sesiones se pierden al reiniciar el back.");
+            log.warn("JWT_CLAVE no está definida: se usa una clave al azar y las sesiones y los dispositivos "
+                    + "habilitados se pierden al reiniciar el back.");
             return Jwts.SIG.HS256.key().build();
         }
         // Si la clave tiene menos de 32 bytes, hmacShaKeyFor tira WeakKeyException y el back no arranca.

@@ -64,6 +64,37 @@ class UsuarioTest {
         assertThat(new Rol("GERENTE_DUENO", "Gerente/Dueño").entraConPin()).isFalse();
     }
 
+    @Test
+    void entranConEmailSoloElAdminYElGerenteDueno() {
+        assertThat(new Rol("ADMIN", "Admin").entraConEmail()).isTrue();
+        assertThat(new Rol("GERENTE_DUENO", "Gerente/Dueño").entraConEmail()).isTrue();
+        assertThat(new Rol("MOZO", "Mozo").entraConEmail()).isFalse();
+        assertThat(new Rol("CAJA", "Caja").entraConEmail()).isFalse();
+        assertThat(new Rol("COCINA", "Cocina").entraConEmail()).isFalse();
+    }
+
+    @Test
+    void soloElMozoEntraConUsuarioYContrasenaCadaSieteDias() {
+        assertThat(new Rol("MOZO", "Mozo").esMozo()).isTrue();
+        assertThat(new Rol("CAJA", "Caja").esMozo()).isFalse();
+        assertThat(new Rol("COCINA", "Cocina").esMozo()).isFalse();
+        assertThat(new Rol("ADMIN", "Admin").esMozo()).isFalse();
+        assertThat(new Rol("GERENTE_DUENO", "Gerente/Dueño").esMozo()).isFalse();
+    }
+
+    @Test
+    void elegirLaCredencialApagaLaMarca() {
+        // Un hash NULL deja el que tenía: el mozo que después de un blanqueo solo elige el PIN.
+        Usuario pedro = new Usuario(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", null, "contrasena", "pin");
+        assertThat(pedro.isDebeCambiarCredencial()).isTrue();
+
+        pedro.elegirCredencial("pinNuevo", null);
+
+        assertThat(pedro.isDebeCambiarCredencial()).isFalse();
+        assertThat(pedro.getPinHash()).isEqualTo("pinNuevo");
+        assertThat(pedro.getHashPassword()).isEqualTo("contrasena");
+    }
+
     private void fallar(int veces) {
         for (int i = 0; i < veces; i++) {
             juan.registrarIntentoFallido();
