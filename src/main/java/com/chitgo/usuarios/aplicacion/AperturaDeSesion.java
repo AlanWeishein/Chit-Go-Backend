@@ -12,9 +12,15 @@ import com.chitgo.usuarios.dominio.Local;
 import com.chitgo.usuarios.dominio.Usuario;
 import com.chitgo.usuarios.dominio.puertos.EmisorDeTokens;
 
-/** Lo que hacen todos los logins cuando la credencial ya está verificada: emitir el token y armar la sesión. */
+/**
+ * Lo que hacen todos los logins cuando la credencial ya está verificada, y la renovación de cada request:
+ * emitir el token con el T de RNF-14 y armar la sesión.
+ */
 @Component
 class AperturaDeSesion {
+
+    /** Caja se corta a la hora (09/10), con el aviso a los 55 minutos en el front. No la configura el Admin. */
+    static final Duration DURACION_CAJA = Duration.ofHours(1);
 
     /** El Gerente/Dueño no tiene local, y por lo tanto no tiene el T que configura el Admin. */
     static final Duration DURACION_SIN_LOCAL = Duration.ofMinutes(10);
@@ -27,10 +33,7 @@ class AperturaDeSesion {
 
     /** @param local NULL para el Gerente/Dueño */
     ResultadoDeIngreso abrir(Usuario usuario, Local local) {
-        // Tarea 7: T según el rol (Caja, 60 minutos). Por ahora, el del local para todos los que tienen uno.
-        Duration duracion = local != null
-                ? Duration.ofMinutes(local.getMinutosInactividadSesion())
-                : DURACION_SIN_LOCAL;
+        Duration duracion = duracionPara(usuario, local);
         Long localId = local != null ? local.getId() : null;
         DatosDeSesion datos = new DatosDeSesion(usuario.getId(), usuario.getRol().getCodigo(), localId,
                 usuario.isDebeCambiarCredencial());
@@ -42,5 +45,13 @@ class AperturaDeSesion {
         SesionDto sesion = new SesionDto(usuario.getId(), usuario.getNombre(), datos.rol(), localDto,
                 datos.debeCambiarCredencial(), expiraEn);
         return new ResultadoDeIngreso(token, duracion, sesion);
+    }
+
+    /** El T según el rol: Caja, una hora; el resto, el del local (10 por defecto); el Gerente/Dueño, 10. */
+    static Duration duracionPara(Usuario usuario, Local local) {
+        if (usuario.getRol().esCaja()) {
+            return DURACION_CAJA;
+        }
+        return local != null ? Duration.ofMinutes(local.getMinutosInactividadSesion()) : DURACION_SIN_LOCAL;
     }
 }

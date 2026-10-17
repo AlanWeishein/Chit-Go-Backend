@@ -70,7 +70,9 @@ encabezado del SQL.
   no sea provisoria (ver "Primer ingreso").
 - CSRF: cualquier respuesta deja la cookie `XSRF-TOKEN`, que sí se lee desde JavaScript. Todo `POST`,
   `PUT`, `PATCH` y `DELETE` tiene que mandar su valor en el header `X-XSRF-TOKEN`, también los logins.
-  Sin el header, o con otro valor, responde 403. Va en un solo lugar: `compartido/api`.
+  Sin el header, o con otro valor, responde 403. Va en un solo lugar: `compartido/api`. La cookie cambia
+  en cada respuesta a un request con sesión (también `/auth/sesion`): hay que leerla al mandar cada
+  request, no guardarla en una variable.
 - Los errores salen en ProblemDetail (`application/problem+json`).
 - Con el perfil `dev` las cookies van sin `Secure`, para probar por http desde el celular con la IP de
   la compu. Fuera de dev, `COOKIE_SEGURA=false` hace lo mismo.
@@ -142,6 +144,26 @@ encabezado del SQL.
     contraseña." si falta la que le toca, y 400 genérico si manda una que su rol no usa o no tiene el
     formato. En todos los casos no se guarda nada: si al mozo le falla la contraseña, tampoco se guarda el PIN.
   - 409 "Tu credencial no es provisoria.": ya la eligió.
+
+### Duración y corte por inactividad (RNF-14)
+
+- El token dura T minutos y cada request con sesión lo renueva: la respuesta trae una cookie
+  `chitgo_sesion` nueva con T contado desde ahí. A los T minutos sin actividad vence solo y lo próximo da
+  401 "No hay una sesión iniciada, o venció.": el front vuelve al login.
+- T según el rol: Caja, 60 minutos (fijo); Mozo, Cocina y Admin, el del local
+  (`minutos_inactividad_sesion`, 10 por defecto); el Gerente/Dueño, 10.
+- No renuevan: las públicas, `GET /auth/sesion` (consultarla no cuenta como actividad), `POST
+  /auth/credencial` (deja su propia cookie nueva) y `POST /auth/logout` (la borra). Un login con la cookie
+  de otro usuario todavía puesta deja solo la del que entra.
+- Cualquier request automático con sesión cuenta como actividad: un polling, el refetch al volver a la
+  pestaña, un reintento. Si el front pide algo solo cada tanto, la sesión no se corta nunca. Las
+  novedades van por el WebSocket.
+- Aviso de Caja a los 55 minutos: el vencimiento se corre con cada request. El front puede reiniciar su
+  cuenta en cada respuesta, o leer `expiraEn` de `GET /auth/sesion`, que no renueva.
+- No cerrar la sesión ni cambiar de usuario con requests pendientes: una respuesta que llega después del
+  logout vuelve a dejar la cookie del anterior.
+- La renovación mira la base: un usuario dado de baja da 401 en el próximo request, y uno al que le
+  blanquearon la credencial da 403 con `CREDENCIAL_PROVISORIA`.
 
 ## Fechas
 

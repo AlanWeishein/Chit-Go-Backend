@@ -74,4 +74,9 @@ public class Rol {
     public boolean esMozo() {
         return "MOZO".equals(codigo);
     }
+
+    /** Caja tiene su propio corte por inactividad: una hora, en vez del T del local (RNF-14). */
+    public boolean esCaja() {
+        return "CAJA".equals(codigo);
+    }
 }
