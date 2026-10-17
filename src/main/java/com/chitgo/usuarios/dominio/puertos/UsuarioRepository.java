@@ -20,6 +20,9 @@ public interface UsuarioRepository {
     /** El email es único en toda la base. También con la fila bloqueada, por el mismo motivo. */
     Optional<Usuario> buscarPorEmailParaIngreso(String email);
 
+    /** El nombre de usuario del mozo es único dentro del local. También con la fila bloqueada. */
+    Optional<Usuario> buscarPorNombreDeUsuarioParaIngreso(Long localId, String nombreUsuario);
+
     /** Los activos del local con alguno de esos roles, ordenados por nombre. */
     List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol);
 }

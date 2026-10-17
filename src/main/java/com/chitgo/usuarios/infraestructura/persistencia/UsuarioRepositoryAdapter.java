@@ -34,6 +34,11 @@ class UsuarioRepositoryAdapter implements UsuarioRepository {
     }
 
     @Override
+    public Optional<Usuario> buscarPorNombreDeUsuarioParaIngreso(Long localId, String nombreUsuario) {
+        return jpa.buscarPorNombreDeUsuarioConBloqueo(localId, nombreUsuario);
+    }
+
+    @Override
     public List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol) {
         return jpa.findByLocalIdAndActivoTrueAndRolCodigoInOrderByNombreAsc(localId, codigosDeRol);
     }

@@ -65,8 +65,9 @@ encabezado del SQL.
 - La sesión del personal es un JWT en la cookie `chitgo_sesion` (HttpOnly, SameSite=Strict). El front
   no la puede leer: para saber quién está logueado llama a `GET /api/v1/auth/sesion`, que da 401 si no hay
   sesión.
-- Públicas: `/api/v1/ping`, `/api/v1/public/**` y los `POST` de login (`/auth/pin`, `/auth/mozo/login`,
-  `/auth/admin/login`). Todo lo demás pide la cookie.
+- Públicas: `/api/v1/ping`, `/api/v1/public/**`, los `POST` de login (`/auth/pin`, `/auth/mozo/login`,
+  `/auth/admin/login`) y `GET /auth/dispositivo`. Todo lo demás pide la cookie, y además que la credencial
+  no sea provisoria (ver "Primer ingreso").
 - CSRF: cualquier respuesta deja la cookie `XSRF-TOKEN`, que sí se lee desde JavaScript. Todo `POST`,
   `PUT`, `PATCH` y `DELETE` tiene que mandar su valor en el header `X-XSRF-TOKEN`, también los logins.
   Sin el header, o con otro valor, responde 403. Va en un solo lugar: `compartido/api`.
@@ -82,11 +83,35 @@ encabezado del SQL.
 - `POST /api/v1/auth/pin` con `{tokenStaff, usuarioId, pin}` (PIN de 4 a 10 dígitos). Si entra, deja la
   cookie de sesión y responde 200 con lo mismo que `/auth/sesion`. Si no:
   - 401 "PIN incorrecto": suma un intento fallido.
+  - 401 con `"codigo": "CONTRASENA_REQUERIDA"`: es un mozo y este dispositivo no tiene su cookie de
+    dispositivo vigente. Hay que mostrar P-32 (ver abajo). No mira el PIN ni suma intentos. Comparar el
+    `codigo`, no el texto del `detail`.
   - 423 "Tu usuario está bloqueado. Pedile al Admin que te blanquee el PIN.": al quinto intento fallido
-    seguido, y desde ahí también con el PIN correcto. No vence solo.
+    seguido, y desde ahí también con el PIN correcto. No vence solo. Se mira antes que la cookie de
+    dispositivo: un mozo bloqueado ve el 423 aunque no tenga la cookie.
   - 404: el token de staff no existe, o el usuario no es de ese local, está dado de baja o no entra con
     PIN. No suma intentos.
   - 400: falta un dato o el PIN no tiene de 4 a 10 dígitos. No suma intentos.
+
+### Usuario y contraseña del mozo, cada 7 días (P-32)
+
+- Al abrir la app del mozo, `GET /api/v1/auth/dispositivo`. Responde 200 con `{id, nombre, venceEn}` si
+  en este navegador hay una cookie de dispositivo vigente (el front puede ir directo al PIN de ese mozo), o
+  204 si no la hay, venció o el mozo fue dado de baja: entonces va P-32. Es un `GET`, no lleva el header
+  CSRF, y no renueva nada.
+- `POST /api/v1/auth/mozo/login` con `{tokenStaff, nombreUsuario, password}`. El usuario es único dentro
+  del local del QR y no distingue mayúsculas. Si entra, responde 200 con `{id, nombre, venceEn}` y deja la
+  cookie `chitgo_dispositivo` (HttpOnly, SameSite=Strict, 7 días, `Path=/api/v1/auth`: viaja a todo lo que
+  cuelga de esa ruta). **No abre la sesión**: después va el PIN de ese mozo con `/auth/pin`. Si no:
+  - 401 "Usuario o contraseña incorrectos", siempre el mismo: el usuario no existe en ese local, la
+    contraseña está mal, o está bloqueado, dado de baja o no es mozo. La contraseña mal suma un intento, con
+    el mismo contador que el PIN, y al quinto queda bloqueado.
+  - 404 "El QR de staff no es válido.": el token de staff no existe.
+  - 400: falta un dato, el usuario pasa de 40 caracteres, o la contraseña no tiene de 8 a 64 caracteres o
+    pasa de 72 bytes. No suma intentos.
+- Los 7 días se cuentan desde la contraseña: entrar con el PIN no los renueva, y el logout no borra la
+  cookie de dispositivo. Hay una por navegador: si otro mozo entra con contraseña en el mismo celular, la
+  pisa.
 
 ### Login con email (Admin y Gerente/Dueño)
 
@@ -98,6 +123,25 @@ encabezado del SQL.
     quinto seguido queda bloqueado (lo destraba el Gerente/Dueño).
   - 400: falta un dato, o la contraseña no tiene de 8 a 64 caracteres o pasa de 72 bytes (con acentos o
     emojis cada carácter ocupa más de uno). No suma intentos.
+
+### Primer ingreso (P-29, P-30, P-31 y P-32b)
+
+- Si el login responde con `debeCambiarCredencial: true`, la credencial es provisoria (alta o blanqueo).
+  Hasta que elija la suya, solo puede usar `POST /auth/credencial`, `GET /auth/sesion` y
+  `POST /auth/logout`. Todo lo demás da 403 con `"codigo": "CREDENCIAL_PROVISORIA"` (comparar el `codigo`).
+- El mozo entra como siempre (P-32 con la contraseña provisoria y después el PIN provisorio), y recién ahí
+  elige: primero la contraseña (P-32b) y después el PIN (P-30). El front junta las dos y las manda juntas.
+- `POST /api/v1/auth/credencial` con `{pin, pinRepetido, password, passwordRepetida}`:
+  - Mozo, Caja y Cocina mandan el PIN (4 a 10 dígitos). El Admin y el Gerente/Dueño, la contraseña (8 a 64
+    caracteres, hasta 72 bytes). El mozo además puede mandar la contraseña: en el primer ingreso hay que
+    pedírsela; después de un blanqueo de PIN, no. Los campos que no van, en `null` o sin mandar.
+  - Si sale bien, responde 200 con lo mismo que `/auth/sesion`, ya con `debeCambiarCredencial: false`, y
+    deja una cookie de sesión nueva. La cookie de dispositivo del mozo no cambia.
+  - 400 "No coinciden": la repetición no es igual. 400 "El PIN nuevo tiene que ser distinto del anterior."
+    o "La contraseña nueva tiene que ser distinta de la anterior.". 400 "Elegí tu PIN." o "Elegí tu
+    contraseña." si falta la que le toca, y 400 genérico si manda una que su rol no usa o no tiene el
+    formato. En todos los casos no se guarda nada: si al mozo le falla la contraseña, tampoco se guarda el PIN.
+  - 409 "Tu credencial no es provisoria.": ya la eligió.
 
 ## Fechas
 

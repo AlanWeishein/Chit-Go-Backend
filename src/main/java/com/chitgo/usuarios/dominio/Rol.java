@@ -69,4 +69,9 @@ public class Rol {
     public boolean entraConEmail() {
         return CODIGOS_CON_EMAIL.contains(codigo);
     }
+
+    /** El mozo además entra con usuario y contraseña cada 7 días (RF-13). */
+    public boolean esMozo() {
+        return "MOZO".equals(codigo);
+    }
 }
