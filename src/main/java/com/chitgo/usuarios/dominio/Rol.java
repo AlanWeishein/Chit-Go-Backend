@@ -21,6 +21,9 @@ public class Rol {
     /** Los que entran con PIN desde la lista del QR de staff (RF-32). */
     public static final Set<String> CODIGOS_CON_PIN = Set.of("MOZO", "CAJA", "COCINA");
 
+    /** Los que entran con email y contraseña (RF-32, P-12). */
+    public static final Set<String> CODIGOS_CON_EMAIL = Set.of("ADMIN", "GERENTE_DUENO");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -61,5 +64,19 @@ public class Rol {
 
     public boolean entraConPin() {
         return CODIGOS_CON_PIN.contains(codigo);
+    }
+
+    public boolean entraConEmail() {
+        return CODIGOS_CON_EMAIL.contains(codigo);
+    }
+
+    /** El mozo además entra con usuario y contraseña cada 7 días (RF-13). */
+    public boolean esMozo() {
+        return "MOZO".equals(codigo);
+    }
+
+    /** Caja tiene su propio corte por inactividad: una hora, en vez del T del local (RNF-14). */
+    public boolean esCaja() {
+        return "CAJA".equals(codigo);
     }
 }

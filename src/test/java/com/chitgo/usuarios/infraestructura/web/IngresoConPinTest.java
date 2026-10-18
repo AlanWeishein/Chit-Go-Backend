@@ -24,6 +24,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.chitgo.usuarios.dominio.Usuario;
+import com.chitgo.usuarios.dominio.puertos.EmisorDeHabilitaciones;
+import com.chitgo.usuarios.infraestructura.seguridad.CookieDeDispositivo;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeSesion;
 
 /**
@@ -49,6 +51,9 @@ class IngresoConPinTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EmisorDeHabilitaciones habilitaciones;
 
     @AfterEach
     void dejarLosUsuariosComoEnLaSeed() {
@@ -240,11 +245,16 @@ class IngresoConPinTest {
         assertThat(intentos(juan)).isZero();
     }
 
+    /**
+     * Siempre con la cookie de dispositivo del usuario elegido, como si ya hubiera entrado con contraseña: lo
+     * que pasa sin ella se prueba en IngresoDeMozoTest. A Caja y Cocina no les cambia nada.
+     */
     private ResultActions ingresar(String tokenStaff, Long usuarioId, String pin) throws Exception {
         Cookie xsrf = mvc.perform(get("/api/v1/ping")).andReturn().getResponse().getCookie("XSRF-TOKEN");
+        Cookie dispositivo = new Cookie(CookieDeDispositivo.NOMBRE, habilitaciones.emitir(usuarioId));
         String cuerpo = """
                 {"tokenStaff": "%s", "usuarioId": %d, "pin": "%s"}""".formatted(tokenStaff, usuarioId, pin);
-        return mvc.perform(post(PIN).cookie(xsrf).header("X-XSRF-TOKEN", xsrf.getValue())
+        return mvc.perform(post(PIN).cookie(xsrf, dispositivo).header("X-XSRF-TOKEN", xsrf.getValue())
                 .contentType(MediaType.APPLICATION_JSON).content(cuerpo));
     }
 

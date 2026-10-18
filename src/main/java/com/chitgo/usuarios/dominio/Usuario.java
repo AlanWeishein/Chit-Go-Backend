@@ -138,6 +138,21 @@ public class Usuario {
         }
     }
 
+    /**
+     * Eligió su credencial en el primer ingreso o después de un blanqueo (CU-12): se guarda y la marca de
+     * cambio obligatorio se apaga. Un hash NULL deja el que tenía, como la contraseña del mozo que solo eligió
+     * el PIN.
+     */
+    public void elegirCredencial(String nuevoPinHash, String nuevoHashPassword) {
+        if (nuevoPinHash != null) {
+            pinHash = nuevoPinHash;
+        }
+        if (nuevoHashPassword != null) {
+            hashPassword = nuevoHashPassword;
+        }
+        debeCambiarCredencial = false;
+    }
+
     /** Entró con la credencial correcta: los intentos vuelven a 0. */
     public void registrarIngreso() {
         intentosFallidos = 0;
