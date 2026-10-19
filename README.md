@@ -66,8 +66,8 @@ encabezado del SQL.
   no la puede leer: para saber quién está logueado llama a `GET /api/v1/auth/sesion`, que da 401 si no hay
   sesión.
 - Públicas: `/api/v1/ping`, `/api/v1/public/**`, los `POST` de login (`/auth/pin`, `/auth/mozo/login`,
-  `/auth/admin/login`) y `GET /auth/dispositivo`. Todo lo demás pide la cookie, y además que la credencial
-  no sea provisoria (ver "Primer ingreso").
+  `/auth/admin/login`) y `GET /auth/dispositivo`. Todo lo demás pide la cookie, que la credencial
+  no sea provisoria (ver "Primer ingreso") y el permiso del endpoint (ver "Permisos y auditoría").
 - CSRF: cualquier respuesta deja la cookie `XSRF-TOKEN`, que sí se lee desde JavaScript. Todo `POST`,
   `PUT`, `PATCH` y `DELETE` tiene que mandar su valor en el header `X-XSRF-TOKEN`, también los logins.
   Sin el header, o con otro valor, responde 403. Va en un solo lugar: `compartido/api`. La cookie cambia
@@ -174,6 +174,39 @@ Java. Al mirar la base a mano, las columnas `TIMESTAMP` se ven en la zona de tu 
 
 `main` estable, `develop` en desarrollo, `feature/...` por tarea. PR a `develop`, lo revisa otro.
 
+## Permisos y auditoría
+
+Para quien arma un endpoint o un Service.
+
+### Pedir un permiso
+
+- Los permisos salen de `permiso` y `rol_permiso` (migración `V2__roles_y_permisos.sql`). Al arrancar, `PermisosPorRolAdapter` los lee y arma en memoria un mapa de rol a permisos. En cada request con sesión, `AutenticadorPorToken` le suma a la sesión una autoridad por cada permiso del rol, con el código tal cual (`pedido.aprobar_rechazar`), además de `ROLE_<rol>`.
+- En el endpoint, sobre el método del controlador:
+
+```java
+@PreAuthorize("hasAuthority('pedido.aprobar_rechazar')")
+```
+
+- Estar logueado no alcanza: sin `@PreAuthorize`, cualquier rol con sesión entra. Cada endpoint nuevo lleva el suyo, con el código copiado de V2: si está mal escrito, nadie entra y el error es un 403 sin explicación.
+- Sin el permiso responde 403 con "No tenés permiso para hacer esto."; sin sesión, 401. Ejemplo de prueba: `ControlDePermisosTest`.
+- Los permisos se leen una sola vez, al arrancar. Si cambia `rol_permiso` con el back andando, no se entera hasta reiniciar.
+
+### Auditar una acción
+
+- El Service llama al puerto `Auditor` dentro de su propio `@Transactional`:
+
+```java
+auditor.registrar(localId, usuarioId, "APROBAR_PEDIDO", "PEDIDO", pedido.getId(),
+        Map.of("estado", "PENDIENTE_APROBACION"), Map.of("estado", "APROBADO"));
+```
+
+- Los valores anterior y nuevo pueden ser un DTO o un `Map`, y se guardan como JSON. En un alta el anterior va `null`, y queda `NULL` en la base. `entidadId` también puede ser `null`.
+- Va en la misma transacción que la acción. Sin transacción abierta falla y no guarda nada, y si falla la escritura del registro la acción tampoco se guarda (CP-33-03, todavía sin confirmar con el grupo).
+- El `localId` lo pasa quien llama y no sale de la sesión: el Gerente/Dueño no tiene local, y en HU-16 va el del Admin afectado.
+- No se audita lo que hace el cliente anónimo, ni los ingresos y bloqueos.
+- Nadie edita ni borra un registro desde la aplicación: el repositorio solo guarda y lee.
+
 ## Pendiente
 
-- Permisos por endpoint contra `rol_permiso` (hoy alcanza con estar logueado).
+- Consulta de la auditoría con filtros y paginada (HU-15, Sprint 3).
+- Retención de 6 meses de la auditoría (RNF-13): hace falta una forma de borrar que hoy el repositorio no tiene.
