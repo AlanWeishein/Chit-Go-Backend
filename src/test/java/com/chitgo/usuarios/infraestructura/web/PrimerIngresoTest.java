@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
+import com.chitgo.usuarios.dominio.puertos.CodificadorDeClaves;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeDispositivo;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeSesion;
 
@@ -55,6 +56,9 @@ class PrimerIngresoTest {
 
     @Autowired
     private ObjectMapper json;
+
+    @Autowired
+    private CodificadorDeClaves codificador;
 
     private List<Map<String, Object>> hashesDeLaSeed;
 
@@ -162,6 +166,25 @@ class PrimerIngresoTest {
 
         assertThat(debeCambiar(juan)).isFalse();
         cookieDeDispositivo("juan", CONTRASENA);
+    }
+
+    @Test
+    void elPinYLaContrasenaNuevosQuedanGuardadosComoHash() throws Exception {
+        // CP-10-10, la parte de la base: después de elegirlos y de entrar varias veces, lo guardado es un hash de
+        // BCrypt y no el texto. Los logs se revisan a mano.
+        Long juan = idDe("Juan");
+        Cookie sesion = sesionDeMozoConProvisoria();
+        elegir(sesion, "86420", "86420", CONTRASENA_NUEVA, CONTRASENA_NUEVA).andExpect(status().isOk());
+
+        Cookie dispositivo = cookieDeDispositivo("juan", CONTRASENA_NUEVA);
+        for (int i = 0; i < 3; i++) {
+            pin(juan, "86420", dispositivo).andExpect(status().isOk());
+        }
+
+        assertThat(pinHash(juan)).startsWith("$2").doesNotContain("86420");
+        assertThat(codificador.verificar("86420", pinHash(juan))).isTrue();
+        assertThat(hashPassword(juan)).startsWith("$2").doesNotContain(CONTRASENA_NUEVA);
+        assertThat(codificador.verificar(CONTRASENA_NUEVA, hashPassword(juan))).isTrue();
     }
 
     @Test
@@ -401,6 +424,10 @@ class PrimerIngresoTest {
 
     private String pinHash(Long usuarioId) {
         return jdbc.queryForObject("SELECT pin_hash FROM usuario WHERE id = ?", String.class, usuarioId);
+    }
+
+    private String hashPassword(Long usuarioId) {
+        return jdbc.queryForObject("SELECT hash_password FROM usuario WHERE id = ?", String.class, usuarioId);
     }
 
     private Long idDe(String nombre) {
