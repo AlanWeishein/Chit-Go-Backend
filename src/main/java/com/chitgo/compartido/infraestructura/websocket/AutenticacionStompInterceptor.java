@@ -14,10 +14,10 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import com.chitgo.pedidos.dominio.puertos.ClienteSesionRepository;
-import com.chitgo.usuarios.aplicacion.AutorizadorDePermisos;
 import com.chitgo.usuarios.dominio.TokenInvalidoException;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 import com.chitgo.usuarios.infraestructura.seguridad.AutenticadorPorToken;
@@ -38,13 +38,11 @@ public class AutenticacionStompInterceptor implements ChannelInterceptor {
 
     private final AutenticadorPorToken autenticadorDelPersonal;
     private final ClienteSesionRepository sesiones;
-    private final AutorizadorDePermisos autorizador;
 
     public AutenticacionStompInterceptor(AutenticadorPorToken autenticadorDelPersonal,
-            ClienteSesionRepository sesiones, AutorizadorDePermisos autorizador) {
+            ClienteSesionRepository sesiones) {
         this.autenticadorDelPersonal = autenticadorDelPersonal;
         this.sesiones = sesiones;
-        this.autorizador = autorizador;
     }
 
     @Override
@@ -96,13 +94,13 @@ public class AutenticacionStompInterceptor implements ChannelInterceptor {
         }
         if (usuario instanceof Authentication autenticacion
                 && autenticacion.getPrincipal() instanceof UsuarioAutenticado personal) {
-            validarTopicDelPersonal(personal, destino);
+            validarTopicDelPersonal(autenticacion, personal, destino);
             return;
         }
         throw new MessagingException("No autenticado");
     }
 
-    private void validarTopicDelPersonal(UsuarioAutenticado personal, String destino) {
+    private void validarTopicDelPersonal(Authentication autenticacion, UsuarioAutenticado personal, String destino) {
         Matcher m = TOPIC_DE_LOCAL.matcher(destino);
         if (!m.matches()) {
             throw new MessagingException("Destino no permitido");
@@ -112,7 +110,10 @@ public class AutenticacionStompInterceptor implements ChannelInterceptor {
             throw new MessagingException("Ese topic es de otro local");
         }
         List<String> requeridos = PermisosDeTopic.requeridos(m.group(2));
-        if (requeridos.isEmpty() || !autorizador.tieneAlguno(personal, requeridos.toArray(String[]::new))) {
+        boolean tiene = autenticacion.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(requeridos::contains);
+        if (requeridos.isEmpty() || !tiene) {
             throw new MessagingException("No tenés permiso para este topic");
         }
     }

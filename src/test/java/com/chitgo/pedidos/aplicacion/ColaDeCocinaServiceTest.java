@@ -33,7 +33,6 @@ import com.chitgo.pedidos.dominio.Mesa;
 import com.chitgo.pedidos.dominio.Pedido;
 import com.chitgo.pedidos.dominio.puertos.PedidoRepository;
 import com.chitgo.pedidos.dominio.puertos.PublicadorDeEventos;
-import com.chitgo.usuarios.aplicacion.AutorizadorDePermisos;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
 class ColaDeCocinaServiceTest {
@@ -51,31 +50,14 @@ class ColaDeCocinaServiceTest {
     private final ClienteSesion sesion = conId(new ClienteSesion(1L, cuenta, TOKEN_CLIENTE, true), 10L);
     private ColaDeCocinaService servicio;
 
-    /** Un autorizador que deja o no deja pasar a todos, sin tocar la base. */
-    private static AutorizadorDePermisos autorizador(boolean permite) {
-        return new AutorizadorDePermisos(null) {
-            @Override
-            public boolean tieneAlguno(UsuarioAutenticado sesion, String... codigos) {
-                return permite;
-            }
-
-            @Override
-            public void exigirAlguno(UsuarioAutenticado sesion, String... codigos) {
-                if (!permite) {
-                    throw new AccesoDenegadoException("No tenés permiso para hacer esto.");
-                }
-            }
-        };
-    }
-
-    private void servicioCon(AutorizadorDePermisos autorizador) {
-        servicio = new ColaDeCocinaService(pedidos, eventos, auditor, autorizador, new ArmadorDePedidos(carta),
+    private void servicioCon() {
+        servicio = new ColaDeCocinaService(pedidos, eventos, auditor, new ArmadorDePedidos(carta),
                 new RelojDePrueba(AHORA));
     }
 
     @BeforeEach
     void preparar() {
-        servicioCon(autorizador(true));
+        servicioCon();
         when(pedidos.guardar(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -107,11 +89,6 @@ class ColaDeCocinaServiceTest {
         assertEquals("4", vista.enCola().get(0).mesa());
     }
 
-    @Test
-    void sin_permiso_no_se_ve_la_cola() {
-        servicioCon(autorizador(false));
-        assertThrows(AccesoDenegadoException.class, () -> servicio.obtener(HUGO));
-    }
 
     @Test
     void el_gerente_dueno_no_tiene_local_y_no_opera_la_cocina() {
@@ -153,11 +130,6 @@ class ColaDeCocinaServiceTest {
         verify(auditor, never()).registrar(any(), any(), any(), any(), any(), any(), any());
     }
 
-    @Test
-    void sin_permiso_no_se_cambia_el_estado() {
-        servicioCon(autorizador(false));
-        assertThrows(AccesoDenegadoException.class, () -> servicio.iniciarPreparacion(HUGO, 5L));
-    }
 
     @Test
     void si_otro_se_adelanto_el_cambio_responde_409_y_no_audita() {

@@ -23,8 +23,6 @@ import com.chitgo.pedidos.dominio.Pedido;
 import com.chitgo.pedidos.dominio.TipoEvento;
 import com.chitgo.pedidos.dominio.puertos.PedidoRepository;
 import com.chitgo.pedidos.dominio.puertos.PublicadorDeEventos;
-import com.chitgo.usuarios.aplicacion.AutorizadorDePermisos;
-import com.chitgo.usuarios.dominio.CodigosDePermiso;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
 /** HU-11: la cola del KDS y pasar cada pedido a En preparación y a Listo. */
@@ -34,16 +32,14 @@ public class ColaDeCocinaService {
     private final PedidoRepository pedidos;
     private final PublicadorDeEventos eventos;
     private final Auditor auditor;
-    private final AutorizadorDePermisos autorizador;
     private final ArmadorDePedidos armador;
     private final Reloj reloj;
 
     public ColaDeCocinaService(PedidoRepository pedidos, PublicadorDeEventos eventos, Auditor auditor,
-            AutorizadorDePermisos autorizador, ArmadorDePedidos armador, Reloj reloj) {
+            ArmadorDePedidos armador, Reloj reloj) {
         this.pedidos = pedidos;
         this.eventos = eventos;
         this.auditor = auditor;
-        this.autorizador = autorizador;
         this.armador = armador;
         this.reloj = reloj;
     }
@@ -51,7 +47,6 @@ public class ColaDeCocinaService {
     /** Las tres columnas del KDS: la cola en orden (prioritarios primero y por llegada), lo que se prepara y lo listo. */
     @Transactional(readOnly = true)
     public VistaDeCocinaDto obtener(UsuarioAutenticado usuario) {
-        autorizador.exigirAlguno(usuario, CodigosDePermiso.PEDIDO_CAMBIAR_ESTADO_COCINA);
         Long localId = localDe(usuario);
         List<Pedido> activos = pedidos.listarActivosDeCocina(localId);
         Map<Long, String> nombres = armador.nombresDePlatos(localId, activos);
@@ -82,7 +77,6 @@ public class ColaDeCocinaService {
 
     private void transicionar(UsuarioAutenticado usuario, Long pedidoId, Consumer<Pedido> accion,
             String nombreAccion, TipoEvento tipo) {
-        autorizador.exigirAlguno(usuario, CodigosDePermiso.PEDIDO_CAMBIAR_ESTADO_COCINA);
         Long localId = localDe(usuario);
         Pedido pedido = pedidos.buscarPorId(pedidoId, localId)
                 .orElseThrow(() -> new NoEncontradoException("El pedido no existe"));
@@ -92,7 +86,7 @@ public class ColaDeCocinaService {
         pedidos.guardar(pedido); // 409 si otro lo cambió un instante antes (@Version)
 
         auditor.registrar(localId, usuario.usuarioId(), nombreAccion, "PEDIDO", pedido.getId(),
-                json(anterior), json(pedido.getEstado()));
+                Map.of("estado", anterior.name()), Map.of("estado", pedido.getEstado().name()));
         publicar(localId, pedido, tipo);
     }
 
@@ -130,7 +124,4 @@ public class ColaDeCocinaService {
                         .toList());
     }
 
-    private static String json(EstadoPedido estado) {
-        return "{\"estado\":\"" + estado.name() + "\"}";
-    }
 }

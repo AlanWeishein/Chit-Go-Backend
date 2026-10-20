@@ -1,6 +1,7 @@
 package com.chitgo.pedidos.infraestructura.web;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,18 +26,21 @@ public class CocinaController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('pedido.cambiar_estado_cocina')")
     public VistaDeCocinaDto cola(@AuthenticationPrincipal UsuarioAutenticado usuario) {
         return colaDeCocina.obtener(usuario);
     }
 
     @PostMapping("/{id}/en-preparacion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('pedido.cambiar_estado_cocina')")
     public void enPreparacion(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable("id") Long id) {
         colaDeCocina.iniciarPreparacion(usuario, id);
     }
 
     @PostMapping("/{id}/listo")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('pedido.cambiar_estado_cocina')")
     public void listo(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable("id") Long id) {
         colaDeCocina.marcarListo(usuario, id);
     }

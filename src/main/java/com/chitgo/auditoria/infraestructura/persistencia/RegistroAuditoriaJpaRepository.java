@@ -1,8 +1,18 @@
 package com.chitgo.auditoria.infraestructura.persistencia;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+import org.springframework.data.repository.Repository;
 
 import com.chitgo.auditoria.dominio.RegistroAuditoria;
 
-interface RegistroAuditoriaJpaRepository extends JpaRepository<RegistroAuditoria, Long> {
+/**
+ * Solo guardar y leer: un registro de auditoría no se edita ni se borra desde la aplicación (CP-29-04). Por
+ * eso no extiende JpaRepository, que trae los delete.
+ */
+interface RegistroAuditoriaJpaRepository extends Repository<RegistroAuditoria, Long> {
+
+    RegistroAuditoria save(RegistroAuditoria registro);
+
+    Optional<RegistroAuditoria> findById(Long id);
 }
