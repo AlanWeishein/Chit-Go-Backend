@@ -1,5 +1,6 @@
 package com.chitgo.pedidos.dominio;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,6 +19,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import com.chitgo.compartido.dominio.ReglaDeNegocioException;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -164,5 +166,53 @@ public class Pedido {
 
     public List<ItemPedido> getItems() {
         return Collections.unmodifiableList(items);
+    }
+
+    // ----- máquina de estados: las reglas viven acá -----
+    // Aprobar, rechazar, cancelar por Caja y servir los suma quien haga HU-07 y HU-05, en esta misma clase.
+
+    /** El cliente cancela: solo mientras Caja no lo resolvió. Cancelado sin usuario = lo canceló el cliente. */
+    public void cancelarPorCliente(Instant ahora) {
+        if (estado != EstadoPedido.PENDIENTE_APROBACION) {
+            throw new ReglaDeNegocioException(mensajeNoCancelable());
+        }
+        estado = EstadoPedido.CANCELADO;
+        canceladoEn = ahora;
+    }
+
+    /** Cocina empieza: solo desde Aprobado. */
+    public void iniciarPreparacion(Instant ahora) {
+        if (estado != EstadoPedido.APROBADO) {
+            throw new ReglaDeNegocioException("Solo se puede empezar a preparar un pedido aprobado");
+        }
+        estado = EstadoPedido.EN_PREPARACION;
+        enPreparacionEn = ahora;
+    }
+
+    /** Cocina termina: solo desde En preparación. No se saltea ni se vuelve atrás. */
+    public void marcarListo(Instant ahora) {
+        if (estado != EstadoPedido.EN_PREPARACION) {
+            throw new ReglaDeNegocioException("Solo se puede marcar listo un pedido en preparación");
+        }
+        estado = EstadoPedido.LISTO;
+        listoEn = ahora;
+    }
+
+    /** Qué le dice al cliente si ya no puede cancelar, según el estado en que está el pedido. */
+    public String mensajeNoCancelable() {
+        return switch (estado) {
+            case APROBADO -> "El pedido ya fue aprobado. Si necesitás cambiarlo, llamá al mozo.";
+            case EN_PREPARACION -> "El pedido ya se está preparando y no se puede cancelar";
+            case CANCELADO -> "El pedido ya fue cancelado";
+            case RECHAZADO -> "El pedido ya fue rechazado";
+            default -> "El pedido ya no se puede cancelar";
+        };
+    }
+
+    /** Suma de cantidad por precio unitario de cada ítem (el precio del momento del pedido). */
+    public BigDecimal total() {
+        return items.stream()
+                .map(i -> i.getPrecioUnitario().multiply(BigDecimal.valueOf(i.getCantidad())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
