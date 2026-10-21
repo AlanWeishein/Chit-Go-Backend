@@ -7,65 +7,36 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.Map;
-
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
 
-import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 import com.chitgo.usuarios.dominio.puertos.EmisorDeHabilitaciones;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeDispositivo;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeSesion;
 
 /**
  * Los permisos del rol de punta a punta: login con PIN, el filtro arma las autoridades con PermisosPorRol y el
- * {@code @PreAuthorize} del endpoint las mira. Ningún endpoint real pide un permiso todavía (el primero es la cola
- * de aprobación de HU-07), así que el test trae el suyo. Contra el MySQL del Compose y los usuarios de
- * R__datos_de_prueba.sql, sin {@code @Transactional}, por lo mismo que IngresoConPinTest.
+ * {@code @PreAuthorize} del endpoint las mira, con la cola de aprobación de HU-07, que pide el permiso que en V2
+ * tiene solo Caja. Contra el MySQL del Compose y los usuarios de R__datos_de_prueba.sql, sin
+ * {@code @Transactional}, por lo mismo que IngresoConPinTest.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
 class ControlDePermisosTest {
 
-    private static final String RUTA = "/api/v1/prueba/cola-de-aprobacion";
+    private static final String RUTA = "/api/v1/caja/pedidos";
     private static final String TOKEN_LA_ESQUINA = "83f39b25-deac-4fde-80cc-4cfdf8117713";
     private static final String SIN_PERMISO = "No tenés permiso para hacer esto.";
-
-    /** Hace de la cola de aprobación hasta que exista: pide el permiso que en V2 tiene solo Caja. */
-    @RestController
-    static class ColaDePrueba {
-
-        @GetMapping(RUTA)
-        @PreAuthorize("hasAuthority('pedido.aprobar_rechazar')")
-        public Map<String, String> cola(@AuthenticationPrincipal UsuarioAutenticado usuario) {
-            return Map.of("rol", usuario.rol());
-        }
-    }
-
-    @TestConfiguration
-    static class ConEndpointDePrueba {
-
-        @Bean
-        ColaDePrueba colaDePrueba() {
-            return new ColaDePrueba();
-        }
-    }
 
     @Autowired
     private MockMvc mvc;
@@ -87,7 +58,7 @@ class ControlDePermisosTest {
     void cajaTieneElPermisoYEntra() throws Exception {
         mvc.perform(get(RUTA).cookie(sesionDe("Carla", "2468")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.rol").value("CAJA"));
+                .andExpect(jsonPath("$").isArray());
     }
 
     @Test
@@ -159,6 +130,13 @@ class ControlDePermisosTest {
             sinPermiso(mvc.perform(post("/api/v1/cocina/pedidos/999999/" + accion)
                     .cookie(sesion, xsrf).header("X-XSRF-TOKEN", xsrf.getValue())));
         }
+    }
+
+    @Test
+    void cocinaEntraASuCola() throws Exception {
+        mvc.perform(get("/api/v1/cocina/pedidos").cookie(sesionDe("Hugo", "1357")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enCola").isArray());
     }
 
     private Long idDe(String nombre) {

@@ -165,6 +165,57 @@ encabezado del SQL.
 - La renovación mira la base: un usuario dado de baja da 401 en el próximo request, y uno al que le
   blanquearon la credencial da 403 con `CREDENCIAL_PROVISORIA`.
 
+## Cola de aprobación (para el front)
+
+HU-07, pantalla P-08. Las tres rutas piden sesión de Caja (el permiso `pedido.aprobar_rechazar`): sin sesión
+dan 401 y con otro rol, 403. Los errores salen en ProblemDetail y el `detail` se puede mostrar tal cual.
+
+- `GET /api/v1/caja/pedidos?estado=PENDIENTE_APROBACION`. `estado` se puede omitir; otro valor da 400.
+  Devuelve la lista sin envolver, del pedido más viejo al más nuevo:
+
+```json
+[
+  {
+    "id": 12,
+    "mesa": "1",
+    "enviadoEn": "2026-10-21T23:00:00Z",
+    "segundosDeEspera": 181,
+    "demorado": true,
+    "items": [
+      {"platoId": 2, "plato": "Ensalada mixta", "cantidad": 1, "observacion": "sin sal", "disponible": false}
+    ]
+  }
+]
+```
+
+  - `mesa` es el número que se muestra, no el id.
+  - `segundosDeEspera` y `demorado` los calcula el back con su reloj, en el momento del `GET`. `demorado` es
+    más de 3 minutos: a los 180 segundos todavía no, a los 181 sí. El aviso en vivo (`ALERTA_DEMORA`) es de
+    HU-08, en el Sprint 2.
+  - `disponible: false` quiere decir que el plato se apagó después de que el cliente lo pidió. No van precios.
+- `POST /api/v1/caja/pedidos/{id}/aprobar`, sin body. Responde 204.
+- `POST /api/v1/caja/pedidos/{id}/rechazar` con `{"motivo": "MESA_NO_OCUPADA"}`. Los motivos son
+  `NO_DISPONIBLE`, `PEDIDO_INVALIDO` y `MESA_NO_OCUPADA`. Responde 204; sin motivo o con otro valor, 400.
+  **No lleva `version`**: el back la toma de la base, y si llega se ignora.
+- Los dos `POST` llevan el header `X-XSRF-TOKEN`, como todo `POST` (ver "Sesión y CSRF"). Sin él, 403.
+- Al aprobar o rechazar:
+  - 404 "El pedido no existe": no está, o es de otro local.
+  - 409 "El pedido ya fue cancelado": lo canceló el cliente antes.
+  - 409 "El pedido ya fue resuelto": lo resolvió otra caja, aunque haya sido en el mismo instante.
+  - Con cualquiera de los dos 409, el pedido sale de la cola.
+- Tiempo real, en `/topic/local/{localId}/caja/pedidos`: `PEDIDO_ENVIADO` con cada pedido nuevo,
+  `PEDIDO_CANCELADO` cuando el cliente cancela y `PEDIDO_RESUELTO` cuando cualquier caja aprueba o rechaza.
+  Todas las cajas sacan el pedido de la cola con `PEDIDO_RESUELTO`, también la que lo resolvió. Trae el
+  `estado` (`APROBADO` o `RECHAZADO`) y no trae `detalle`. `mesaId` es el id de la mesa, no el número:
+
+```json
+{"tipo": "PEDIDO_RESUELTO", "pedidoId": 12, "mesaId": 1, "estado": "APROBADO", "detalle": null,
+ "ocurridoEn": "2026-10-21T23:03:05Z"}
+```
+
+- Los eventos que se pierden con el WebSocket caído no se repiten: al reconectar, volver a pedir el `GET`.
+- Lo prueba `AprobacionDePedidosTest`, contra el MySQL del Compose.
+
 ## Fechas
 
 La conexión a MySQL va en UTC (`connectionTimeZone` en `application.yml`), igual que los `Instant` de
