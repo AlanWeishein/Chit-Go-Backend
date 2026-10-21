@@ -9,8 +9,11 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.chitgo.compartido.dominio.AccesoDenegadoException;
 import com.chitgo.compartido.dominio.NoEncontradoException;
+import com.chitgo.compartido.dominio.ReglaDeNegocioException;
 import com.chitgo.compartido.dominio.SinSesionException;
+import com.chitgo.compartido.dominio.SolicitudInvalidaException;
 
 /**
  * Pasa las excepciones a ProblemDetail (RFC 9457). Los 401 y 403 de Spring Security también llegan acá:
@@ -42,6 +45,24 @@ public class ManejadorDeErrores {
     @ExceptionHandler(NoEncontradoException.class)
     ProblemDetail noEncontrado(NoEncontradoException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    /** Falta el permiso, o el cliente no es la sesión iniciadora o el pedido es de otra sesión. */
+    @ExceptionHandler(AccesoDenegadoException.class)
+    ProblemDetail accesoDenegado(AccesoDenegadoException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+    }
+
+    /** Transición inválida, cuenta cerrada, plato no disponible o conflicto de concurrencia. */
+    @ExceptionHandler(ReglaDeNegocioException.class)
+    ProblemDetail reglaDeNegocio(ReglaDeNegocioException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    /** Un dato del pedido que no cumple la regla (cantidad, largo de la observación). */
+    @ExceptionHandler(SolicitudInvalidaException.class)
+    ProblemDetail solicitudInvalida(SolicitudInvalidaException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     /** Un campo que falta o no tiene el formato (un PIN con letras), o un cuerpo que no es JSON. */

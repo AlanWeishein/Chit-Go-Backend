@@ -101,4 +101,22 @@ public class Cuenta {
     public Integer getVersion() {
         return version;
     }
+
+    /** Con la cuenta cerrada ya no se puede pedir. */
+    public boolean aceptaPedidos() {
+        return estado != EstadoCuenta.CERRADA;
+    }
+
+    /**
+     * Con la cuenta solicitada se puede seguir pidiendo hasta que se emita el ticket: un pedido nuevo la
+     * vuelve a Abierta (06/10). Devuelve si hubo cambio.
+     */
+    public boolean reabrirSiEstabaSolicitada() {
+        if (estado != EstadoCuenta.SOLICITADA) {
+            return false;
+        }
+        estado = EstadoCuenta.ABIERTA;
+        solicitadaEn = null;
+        return true;
+    }
 }

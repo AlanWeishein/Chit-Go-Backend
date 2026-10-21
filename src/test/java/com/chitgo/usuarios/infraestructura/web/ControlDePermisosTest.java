@@ -150,6 +150,17 @@ class ControlDePermisosTest {
         return sesion;
     }
 
+    @Test
+    void elMozoNoPuedeVerNiCambiarPedidosDeCocina() throws Exception {
+        Cookie sesion = sesionDe("Juan", "1234");
+        sinPermiso(mvc.perform(get("/api/v1/cocina/pedidos").cookie(sesion)));
+        Cookie xsrf = mvc.perform(get("/api/v1/ping")).andReturn().getResponse().getCookie("XSRF-TOKEN");
+        for (String accion : new String[] {"en-preparacion", "listo"}) {
+            sinPermiso(mvc.perform(post("/api/v1/cocina/pedidos/999999/" + accion)
+                    .cookie(sesion, xsrf).header("X-XSRF-TOKEN", xsrf.getValue())));
+        }
+    }
+
     private Long idDe(String nombre) {
         return jdbc.queryForObject("""
                 SELECT u.id FROM usuario u JOIN local l ON l.id = u.local_id
