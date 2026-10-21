@@ -20,6 +20,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
+import com.chitgo.compartido.dominio.SolicitudInvalidaException;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -169,7 +170,33 @@ public class Pedido {
     }
 
     // ----- máquina de estados: las reglas viven acá -----
-    // Aprobar, rechazar, cancelar por Caja y servir los suma quien haga HU-07 y HU-05, en esta misma clase.
+    // Cancelar por Caja y servir los suma quien haga RF-05 y HU-05, en esta misma clase.
+
+    /** Caja aprueba (HU-07): solo un pedido pendiente. Queda quién lo resolvió y a qué hora. */
+    public void aprobar(Long usuarioId, Instant ahora) {
+        exigirPendiente();
+        estado = EstadoPedido.APROBADO;
+        resueltoPorUsuarioId = usuarioId;
+        resueltoEn = ahora;
+    }
+
+    /** Caja rechaza (HU-07): solo un pedido pendiente y siempre con un motivo de la lista. */
+    public void rechazar(MotivoRechazo motivo, Long usuarioId, Instant ahora) {
+        if (motivo == null) {
+            throw new SolicitudInvalidaException("Elegí el motivo del rechazo");
+        }
+        exigirPendiente();
+        estado = EstadoPedido.RECHAZADO;
+        motivoRechazo = motivo;
+        resueltoPorUsuarioId = usuarioId;
+        resueltoEn = ahora;
+    }
+
+    private void exigirPendiente() {
+        if (estado != EstadoPedido.PENDIENTE_APROBACION) {
+            throw new ReglaDeNegocioException(mensajeNoResoluble());
+        }
+    }
 
     /** El cliente cancela: solo mientras Caja no lo resolvió. Cancelado sin usuario = lo canceló el cliente. */
     public void cancelarPorCliente(Instant ahora) {
@@ -207,6 +234,11 @@ public class Pedido {
             case RECHAZADO -> "El pedido ya fue rechazado";
             default -> "El pedido ya no se puede cancelar";
         };
+    }
+
+    /** Qué le dice a Caja si ya no puede aprobarlo ni rechazarlo: lo canceló el cliente u otra caja lo resolvió. */
+    public String mensajeNoResoluble() {
+        return estado == EstadoPedido.CANCELADO ? "El pedido ya fue cancelado" : "El pedido ya fue resuelto";
     }
 
     /** Suma de cantidad por precio unitario de cada ítem (el precio del momento del pedido). */
