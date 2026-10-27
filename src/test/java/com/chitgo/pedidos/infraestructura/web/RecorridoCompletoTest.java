@@ -60,7 +60,8 @@ import com.chitgo.usuarios.dominio.puertos.EmisorDeHabilitaciones;
 /**
  * El objetivo del Sprint 1 de punta a punta en el back (ST-05, tarea 3): el celular escanea y pide, Caja aprueba,
  * Cocina lo prepara y el mozo se entera, mirando también lo que viaja por STOMP (CP-01-01, CP-03-01, CP-19-01,
- * CP-19-03 y CP-24-01). Suma los casos por HTTP que la tarea 1 dejó para esta clase: CP-01-03, CP-03-08 y CP-24-03.
+ * CP-19-03 y CP-24-01). Suma los casos por HTTP que la tarea 1 dejó para esta clase: CP-01-03, CP-03-08 y CP-24-03,
+ * y CP-02-02, el filtro de la carta, que se sumó al cerrar la ST (tarea 4).
  *
  * <p>El HTTP va por MockMvc y /ws por el puerto real, con el mismo contexto y el mismo broker. Como
  * AprobacionDePedidosTest: contra el MySQL del Compose y R__datos_de_prueba.sql, sin {@code @Transactional}, y cada
@@ -341,6 +342,24 @@ class RecorridoCompletoTest {
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pedido WHERE id > ?", Integer.class,
                 ayudas.ultimoIdAntes("pedido"))).isZero();
+    }
+
+    @Test
+    void conElFiltroSinTaccSoloQuedanLaEnsaladaYElFlan() throws Exception {
+        // CP-02-02: la carta de la seed, con el filtro como lo manda la app. Sin filtro también está la Milanesa.
+        String menu = "/api/v1/public/mesas/" + MESA_1_ESQUINA + "/menu";
+        String completa = mvc.perform(get(menu))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        String sinTacc = mvc.perform(get(menu).param("etiqueta", "sin-tacc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(JsonPath.<List<String>>read(completa, "$.categorias[*].platos[*].nombre"))
+                .contains("Milanesa napolitana");
+        assertThat(JsonPath.<List<String>>read(sinTacc, "$.categorias[*].platos[*].nombre"))
+                .containsExactlyInAnyOrder("Ensalada mixta", "Flan casero");
+        assertThat(JsonPath.<List<String>>read(sinTacc, "$.destacados[*].nombre")).containsExactly("Flan casero");
     }
 
     @Test
