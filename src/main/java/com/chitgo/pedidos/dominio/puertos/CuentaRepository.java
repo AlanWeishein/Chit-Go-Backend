@@ -1,13 +1,19 @@
 package com.chitgo.pedidos.dominio.puertos;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import com.chitgo.pedidos.dominio.Cuenta;
+import com.chitgo.pedidos.dominio.EstadoCuenta;
 
 public interface CuentaRepository {
 
     /** Del local: una de otro local da lo mismo que una que no existe. */
     Optional<Cuenta> buscarPorId(Long id, Long localId);
+
+    /** Las del local en esos estados, con la mesa, en una sola consulta y sin orden. */
+    List<Cuenta> listarDelLocal(Long localId, Collection<EstadoCuenta> estados);
 
     /** La cuenta de la mesa que no está cerrada (como mucho hay una). */
     Optional<Cuenta> buscarNoCerradaDeMesa(Long mesaId);

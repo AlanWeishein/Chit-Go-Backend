@@ -1,5 +1,7 @@
 package com.chitgo.pedidos.infraestructura.persistencia;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +17,10 @@ interface CuentaJpaRepository extends JpaRepository<Cuenta, Long> {
     Optional<Cuenta> findByIdAndLocalId(Long id, Long localId);
 
     Optional<Cuenta> findFirstByMesaIdAndEstadoNot(Long mesaId, EstadoCuenta estado);
+
+    @Query("SELECT c FROM Cuenta c JOIN FETCH c.mesa WHERE c.localId = :localId AND c.estado IN :estados")
+    List<Cuenta> delLocalConEstados(@Param("localId") Long localId,
+            @Param("estados") Collection<EstadoCuenta> estados);
 
     /**
      * Sube la versión ya, con el UPDATE: devuelve 0 filas si otro la cambió antes. No se usa

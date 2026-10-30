@@ -1,5 +1,7 @@
 package com.chitgo.pedidos.infraestructura.persistencia;
 
+import java.util.Optional;
+
 import org.springframework.stereotype.Repository;
 
 import com.chitgo.pedidos.dominio.Ticket;
@@ -17,5 +19,10 @@ class TicketRepositoryAdapter implements TicketRepository {
     @Override
     public Ticket guardar(Ticket ticket) {
         return jpa.saveAndFlush(ticket);
+    }
+
+    @Override
+    public Optional<Ticket> buscarDeLaCuenta(Long cuentaId) {
+        return jpa.findByCuentaId(cuentaId);
     }
 }

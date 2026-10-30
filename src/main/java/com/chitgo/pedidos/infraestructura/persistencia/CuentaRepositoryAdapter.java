@@ -1,5 +1,7 @@
 package com.chitgo.pedidos.infraestructura.persistencia;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.dao.PessimisticLockingFailureException;
@@ -25,6 +27,11 @@ class CuentaRepositoryAdapter implements CuentaRepository {
     @Override
     public Optional<Cuenta> buscarPorId(Long id, Long localId) {
         return jpa.findByIdAndLocalId(id, localId);
+    }
+
+    @Override
+    public List<Cuenta> listarDelLocal(Long localId, Collection<EstadoCuenta> estados) {
+        return jpa.delLocalConEstados(localId, estados);
     }
 
     @Override
