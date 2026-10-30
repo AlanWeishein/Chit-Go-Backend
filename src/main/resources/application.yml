@@ -2,9 +2,16 @@ spring:
   application:
     name: chit-go-back
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/chitgo}
+    url: ${DB_URL:jdbc:mysql://localhost:3307/chitgo}
     username: ${DB_USER:chitgo}
     password: ${DB_PASSWORD:chitgo}
+    # La sesión de MySQL en UTC, como escribe Hibernate los Instant. Si no, con el MySQL en -03 todo lo que
+    # guarda JPA queda 3 horas corrido respecto de CURRENT_TIMESTAMP. Va acá y no en la URL para que valga
+    # también con otro DB_URL.
+    hikari:
+      data-source-properties:
+        connectionTimeZone: UTC
+        forceConnectionTimeZoneToSession: true
   jpa:
     open-in-view: false
     hibernate:
@@ -14,3 +21,13 @@ spring:
 
 server:
   port: 8080
+
+chitgo:
+  jwt:
+    # Clave para firmar el JWT de la sesión, en Base64 (32 bytes o más). Sin valor por defecto a
+    # propósito: si falta, el back usa una clave al azar y avisa en el log (ver .env.example).
+    clave: ${JWT_CLAVE:}
+  sesion:
+    # Secure en la cookie de sesión y en la de CSRF. El perfil dev la apaga para entrar por http
+    # desde el celular con la IP de la compu.
+    cookie-segura: ${COOKIE_SEGURA:true}

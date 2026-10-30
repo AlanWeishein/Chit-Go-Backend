@@ -1,0 +1,28 @@
+package com.chitgo.usuarios.dominio.puertos;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+import com.chitgo.usuarios.dominio.Usuario;
+
+/** Sin filtro por local: el login busca por email en toda la base (ver entidades-jpa-soluciones). */
+public interface UsuarioRepository {
+
+    Optional<Usuario> buscarPorId(Long id);
+
+    /**
+     * Con la fila bloqueada hasta el fin de la transacción: dos intentos al mismo tiempo no pisan el contador
+     * de intentos fallidos.
+     */
+    Optional<Usuario> buscarPorIdParaIngreso(Long id);
+
+    /** El email es único en toda la base. También con la fila bloqueada, por el mismo motivo. */
+    Optional<Usuario> buscarPorEmailParaIngreso(String email);
+
+    /** El nombre de usuario del mozo es único dentro del local. También con la fila bloqueada. */
+    Optional<Usuario> buscarPorNombreDeUsuarioParaIngreso(Long localId, String nombreUsuario);
+
+    /** Los activos del local con alguno de esos roles, ordenados por nombre. */
+    List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol);
+}
