@@ -244,8 +244,31 @@ dice desde qué estados puede cancelar:
 ## Cierre de cuenta (para el front)
 
 HU-10, pantalla P-09. Pide sesión de Caja (el permiso `cuenta.cerrar`): sin sesión da 401, con otro rol 403, y el
-Gerente/Dueño, que no tiene local, también 403. Esta sección cubre `POST /api/v1/caja/cuentas/{id}/cerrar`; el
-listado de cuentas por cobrar y la reimpresión del ticket llegan en la tarea 3 de ST-09.
+Gerente/Dueño, que no tiene local, también 403. Son tres rutas: el listado de cuentas por cobrar, el cierre y la
+reimpresión del ticket.
+
+### Cuentas por cobrar
+
+- `GET /api/v1/caja/cuentas?estado=ABIERTA,SOLICITADA`: las cuentas sin cerrar del local de la sesión. Primero
+  las Solicitadas, por `solicitadaEn`, y después las Abiertas, por `abiertaEn`.
+- `estado` acepta `ABIERTA`, `SOLICITADA` o los dos separados por coma, en mayúsculas. Sin `estado` son los dos.
+  `CERRADA` o cualquier otro valor da 400 "Las cuentas por cobrar se piden con estado ABIERTA, SOLICITADA o los
+  dos separados por coma".
+
+```json
+[
+  {"id": 7, "mesa": "2", "estado": "SOLICITADA", "abiertaEn": "2026-10-30T20:40:00Z",
+   "solicitadaEn": "2026-10-30T21:10:00Z", "total": 6000.00, "pedidosSinServir": 1},
+  {"id": 6, "mesa": "1", "estado": "ABIERTA", "abiertaEn": "2026-10-30T20:30:00Z",
+   "solicitadaEn": null, "total": 17500.00, "pedidosSinServir": 1}
+]
+```
+
+- `mesa` es el número que se muestra. `total` suma todos los pedidos que no están Rechazados ni Cancelados,
+  **también los sin servir**. No es lo que se va a cobrar si Caja cierra en ese momento: el cierre cancela lo sin
+  servir y el ticket sale por menos. `pedidosSinServir` dice cuántos hay, para avisarlo.
+
+### Cerrar la cuenta
 
 - `POST /api/v1/caja/cuentas/{id}/cerrar`, con el header `X-XSRF-TOKEN`. El body es opcional; sin body es
   `{"confirmar": false}`:
@@ -313,6 +336,23 @@ listado de cuentas por cobrar y la reimpresión del ticket llegan en la tarea 3 
   nuevo." o, si el cierre ya terminó, "La cuenta de esta mesa ya se cerró".
 - Queda en la auditoría un solo registro, `CERRAR_CUENTA` sobre la cuenta, con el total, el id del ticket y los
   ids de los pedidos cancelados.
+- Después del cierre la mesa queda libre: si el celular que abrió la cuenta manda otro pedido, recibe 409 "La
+  cuenta de esta mesa ya se cerró", y el próximo que escanea el QR abre una cuenta nueva como iniciador.
+
+### Reimprimir el ticket
+
+- `GET /api/v1/caja/cuentas/{id}/ticket`: el mismo JSON que devolvió el cierre, con el mismo `numero`,
+  `emitidoEn` y `total`.
+- Si la cuenta todavía no está cerrada, 404 "Esta cuenta todavía no tiene ticket". Si es de otro local o no
+  existe, 404 "La cuenta no existe".
+- Los renglones se arman de nuevo desde los pedidos, con el precio de cada pedido. Si el nombre de un plato cambió
+  después del cierre, sale con el nombre nuevo.
+
+### Cómo se prueba
+
+`CierreDeCuentaTest` recorre HU-10 contra el MySQL del Compose (CP-22-01 a CP-22-07, dos cierres a la vez, otro
+local y el CSRF). Dos pasos van por SQL porque el back todavía no los tiene: servir un pedido (HU-05) y pedir la
+cuenta (el cliente).
 
 ## Fechas
 
