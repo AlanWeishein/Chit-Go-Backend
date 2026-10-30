@@ -4,6 +4,7 @@ package com.chitgo.pedidos.dominio;
 public enum TipoEvento {
     // Caja
     PEDIDO_ENVIADO, PEDIDO_CANCELADO, CUENTA_REABIERTA, ALERTA_DEMORA,
+    CUENTA_CERRADA, // Caja cerró la cuenta: las otras cajas la sacan de cuentas por cobrar y los mozos ven la mesa libre
     PEDIDO_RESUELTO, // otra caja (o esta) lo aprobó o rechazó: todas lo sacan de la cola (21/10)
     // Cocina
     PEDIDO_APROBADO, PRIORIDAD_CAMBIADA,

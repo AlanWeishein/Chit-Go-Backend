@@ -241,6 +241,79 @@ dice desde qué estados puede cancelar:
   (auditar y publicar).
 - `cancelarPorCliente(ahora)` sigue estando y es `cancelar(CLIENTE, null, ahora)`.
 
+## Cierre de cuenta (para el front)
+
+HU-10, pantalla P-09. Pide sesión de Caja (el permiso `cuenta.cerrar`): sin sesión da 401, con otro rol 403, y el
+Gerente/Dueño, que no tiene local, también 403. Esta sección cubre `POST /api/v1/caja/cuentas/{id}/cerrar`; el
+listado de cuentas por cobrar y la reimpresión del ticket llegan en la tarea 3 de ST-09.
+
+- `POST /api/v1/caja/cuentas/{id}/cerrar`, con el header `X-XSRF-TOKEN`. El body es opcional; sin body es
+  `{"confirmar": false}`:
+
+```json
+{"confirmar": true, "pedidosACancelar": [41]}
+```
+
+- Si la cuenta es de otro local o no existe, 404 "La cuenta no existe". Si ya está cerrada, 409 "La cuenta ya
+  está cerrada".
+- Si no hay nada que confirmar, cierra y responde 200 con el ticket. Hay que confirmar cuando la cuenta está
+  Abierta (nadie la pidió) o tiene pedidos sin servir (Pendiente, Aprobado, En preparación o Listo). Si hay
+  que confirmar y no llega `confirmar: true`, 409 con el campo `codigo`:
+
+```json
+{
+  "status": 409,
+  "detail": "Hay pedidos sin servir. ¿Estás seguro de que querés cerrar la cuenta?",
+  "codigo": "CONFIRMAR_CIERRE",
+  "motivos": ["PEDIDOS_SIN_SERVIR"],
+  "pedidosSinServir": [
+    {"id": 41, "estado": "EN_PREPARACION", "platos": [{"plato": "Milanesa napolitana", "cantidad": 2}]}
+  ]
+}
+```
+
+  - `motivos` puede traer `NADIE_PIDIO_LA_CUENTA`, `PEDIDOS_SIN_SERVIR` o los dos, en ese orden. Con los dos,
+    `detail` trae los dos mensajes seguidos: conviene pintar desde `motivos`. `pedidosSinServir` es `[]` si el
+    único motivo es que nadie pidió la cuenta.
+  - Al confirmar, el front manda `confirmar: true` y los ids de `pedidosSinServir` en `pedidosACancelar`: lo que
+    Caja vio. Si al cerrar aparece un pedido sin servir que no está en esa lista (entró otro pedido), no se
+    cierra nada y vuelve el mismo 409 con la lista de ahora. Lo que se sirvió o se canceló en el medio no frena.
+  - Al cerrar se cancelan todos los pedidos que estén sin servir en ese momento (salen del KDS y no suman al
+    total), con Caja como quien los canceló.
+- Un choque con otra operación en el mismo instante (Cocina marca Listo un pedido, el cliente manda otro) da 409
+  con el `detail` de siempre y no guarda nada: Caja reintenta.
+- La respuesta es el ticket, en JSON; lo imprime el front. `numero` es el id del ticket, `mesa` el número que se
+  muestra. El mismo plato al mismo precio va en un solo renglón. Solo cuentan los pedidos que no quedaron
+  Rechazados ni Cancelados; con todo cancelado el total es 0 y el ticket sale igual:
+
+```json
+{
+  "numero": 5, "local": "La Esquina", "mesa": "1", "emitidoEn": "2026-10-30T21:15:00Z",
+  "items": [
+    {"plato": "Milanesa napolitana", "cantidad": 2, "precioUnitario": 9500.00, "subtotal": 19000.00},
+    {"plato": "Flan casero", "cantidad": 1, "precioUnitario": 4000.00, "subtotal": 4000.00}
+  ],
+  "total": 23000.00, "letra": "X", "leyenda": "DOCUMENTO NO VÁLIDO COMO FACTURA"
+}
+```
+
+- Tiempo real: por cada pedido cancelado, `PEDIDO_CANCELADO` a cocina (`cocina/cola`), a caja (`caja/pedidos`) y a
+  la pantalla, y `CANCELADO` a su cliente. Para la cuenta, `CUENTA_CERRADA` a caja (`caja/pedidos`) y a los
+  mozos (`mozo/avisos`): las otras cajas la sacan de cuentas por cobrar y la mesa queda libre. Es el primer
+  evento de la cuenta que trae `cuentaId`:
+
+```json
+{"tipo": "CUENTA_CERRADA", "pedidoId": null, "mesaId": 1, "cuentaId": 7, "estado": "CERRADA", "detalle": null,
+ "ocurridoEn": "2026-10-30T21:15:00Z"}
+```
+
+  Todos los eventos ahora llevan `cuentaId`; en los de un pedido va en `null`.
+- Mandar un pedido sube siempre la versión de la cuenta: si el cliente manda un pedido justo mientras Caja cierra,
+  uno de los dos recibe 409 y reintenta. Quien manda el pedido recibe "La cuenta cambió justo antes. Probá de
+  nuevo." o, si el cierre ya terminó, "La cuenta de esta mesa ya se cerró".
+- Queda en la auditoría un solo registro, `CERRAR_CUENTA` sobre la cuenta, con el total, el id del ticket y los
+  ids de los pedidos cancelados.
+
 ## Fechas
 
 La conexión a MySQL va en UTC (`connectionTimeZone` en `application.yml`), igual que los `Instant` de

@@ -2,6 +2,7 @@ package com.chitgo.pedidos.infraestructura.persistencia;
 
 import java.util.Optional;
 
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
@@ -13,6 +14,8 @@ import com.chitgo.pedidos.dominio.puertos.CuentaRepository;
 @Repository
 class CuentaRepositoryAdapter implements CuentaRepository {
 
+    private static final String CAMBIO_JUSTO_ANTES = "La cuenta cambió justo antes. Probá de nuevo.";
+
     private final CuentaJpaRepository jpa;
 
     CuentaRepositoryAdapter(CuentaJpaRepository jpa) {
@@ -20,8 +23,8 @@ class CuentaRepositoryAdapter implements CuentaRepository {
     }
 
     @Override
-    public Optional<Cuenta> buscarPorId(Long id) {
-        return jpa.findById(id);
+    public Optional<Cuenta> buscarPorId(Long id, Long localId) {
+        return jpa.findByIdAndLocalId(id, localId);
     }
 
     @Override
@@ -34,7 +37,19 @@ class CuentaRepositoryAdapter implements CuentaRepository {
         try {
             return jpa.saveAndFlush(cuenta);
         } catch (ObjectOptimisticLockingFailureException e) {
-            throw new ConflictoDeConcurrenciaException("La cuenta cambió justo antes. Probá de nuevo.");
+            throw new ConflictoDeConcurrenciaException(CAMBIO_JUSTO_ANTES);
+        }
+    }
+
+    @Override
+    public void subirVersion(Cuenta cuenta) {
+        try {
+            if (jpa.subirVersion(cuenta.getId(), cuenta.getVersion()) == 0) {
+                throw new ConflictoDeConcurrenciaException(CAMBIO_JUSTO_ANTES);
+            }
+        } catch (PessimisticLockingFailureException e) {
+            // Un deadlock (1213) o un lock wait timeout de InnoDB contra otro envío o el cierre: también es un choque.
+            throw new ConflictoDeConcurrenciaException(CAMBIO_JUSTO_ANTES);
         }
     }
 }
