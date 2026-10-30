@@ -170,7 +170,7 @@ public class Pedido {
     }
 
     // ----- máquina de estados: las reglas viven acá -----
-    // Cancelar por Caja y servir los suma quien haga RF-05 y HU-05, en esta misma clase.
+    // Servir lo suma quien haga HU-05, en esta misma clase.
 
     /** Caja aprueba (HU-07): solo un pedido pendiente. Queda quién lo resolvió y a qué hora. */
     public void aprobar(Long usuarioId, Instant ahora) {
@@ -200,11 +200,31 @@ public class Pedido {
 
     /** El cliente cancela: solo mientras Caja no lo resolvió. Cancelado sin usuario = lo canceló el cliente. */
     public void cancelarPorCliente(Instant ahora) {
-        if (estado != EstadoPedido.PENDIENTE_APROBACION) {
-            throw new ReglaDeNegocioException(mensajeNoCancelable());
+        cancelar(OrigenDeCancelacion.CLIENTE, null, ahora);
+    }
+
+    /**
+     * Cancela según quién lo pide: cada origen dice desde qué estados puede. Queda quién y a qué hora;
+     * el usuario va en null solo con el cliente. El origen no se guarda (queda en la auditoría).
+     */
+    public void cancelar(OrigenDeCancelacion origen, Long usuarioId, Instant ahora) {
+        if (origen == null) {
+            throw new IllegalArgumentException("Falta el origen de la cancelación");
+        }
+        // Errores de programación, no del usuario: cancelado_por_usuario_id en NULL tiene que querer decir cliente.
+        if (origen == OrigenDeCancelacion.CLIENTE && usuarioId != null) {
+            throw new IllegalArgumentException("El cliente cancela sin usuario");
+        }
+        if (origen != OrigenDeCancelacion.CLIENTE && usuarioId == null) {
+            throw new IllegalArgumentException("Falta el usuario que cancela");
+        }
+        if (!origen.permite(estado)) {
+            throw new ReglaDeNegocioException(origen == OrigenDeCancelacion.CLIENTE
+                    ? mensajeNoCancelable() : mensajeNoCancelablePorCaja(origen));
         }
         estado = EstadoPedido.CANCELADO;
         canceladoEn = ahora;
+        canceladoPorUsuarioId = usuarioId;
     }
 
     /** Cocina empieza: solo desde Aprobado. */
@@ -234,6 +254,17 @@ public class Pedido {
             case RECHAZADO -> "El pedido ya fue rechazado";
             default -> "El pedido ya no se puede cancelar";
         };
+    }
+
+    /** Qué le dice a Caja (a mano o al cerrar la cuenta) si ya no puede cancelarlo. */
+    private String mensajeNoCancelablePorCaja(OrigenDeCancelacion origen) {
+        if (estado == EstadoPedido.CANCELADO) {
+            return "El pedido ya fue cancelado";
+        }
+        if (origen == OrigenDeCancelacion.CAJA && estado == EstadoPedido.EN_PREPARACION) {
+            return "El pedido ya se está preparando y no se puede cancelar";
+        }
+        return "El pedido ya no se puede cancelar";
     }
 
     /** Qué le dice a Caja si ya no puede aprobarlo ni rechazarlo: lo canceló el cliente u otra caja lo resolvió. */

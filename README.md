@@ -216,6 +216,31 @@ dan 401 y con otro rol, 403. Los errores salen en ProblemDetail y el `detail` se
 - Los eventos que se pierden con el WebSocket caído no se repiten: al reconectar, volver a pedir el `GET`.
 - Lo prueba `AprobacionDePedidosTest`, contra el MySQL del Compose.
 
+## Cancelar un pedido
+
+Para quien arma un Service que cancela (la cancelación en bloque de HU-09, el cierre de cuenta de HU-10).
+Hay una sola forma, en el dominio: `pedido.cancelar(origen, usuarioId, ahora)`. Cada `OrigenDeCancelacion`
+dice desde qué estados puede cancelar:
+
+| Origen | Pendiente | Aprobado | En preparación | Listo | Servido, Rechazado, Cancelado |
+|---|---|---|---|---|---|
+| `CLIENTE` | sí | no | no | no | no |
+| `CAJA` | sí | sí | no | no | no |
+| `CIERRE_DE_CUENTA` | sí | sí | sí | sí | no |
+
+- Guarda `CANCELADO`, `canceladoEn` y `canceladoPorUsuarioId`. Con `CLIENTE` el usuario va en `null` (así se
+  sabe que canceló el cliente); con `CAJA` y `CIERRE_DE_CUENTA` es obligatorio. Pasarlo mal es un error de
+  programación y da `IllegalArgumentException`, no un 4xx.
+- Desde un estado que el origen no acepta, `ReglaDeNegocioException` (409), y el pedido no cambia. Con
+  `CLIENTE` el `detail` es el de HU-02 (por ejemplo "El pedido ya fue aprobado. Si necesitás cambiarlo, llamá
+  al mozo."). Con `CAJA` y `CIERRE_DE_CUENTA`: "El pedido ya fue cancelado", "El pedido ya se está
+  preparando y no se puede cancelar" (solo `CAJA`) o "El pedido ya no se puede cancelar".
+- El origen no se guarda en `pedido`: va en la auditoría que haga el Service.
+- `cancelar` no guarda, no audita ni publica: eso lo hace el Service, dentro de su transacción, como
+  `CancelarPedidoService` (guardar y pasar el choque del `@Version` a 409) y `ResolverPedidoService`
+  (auditar y publicar).
+- `cancelarPorCliente(ahora)` sigue estando y es `cancelar(CLIENTE, null, ahora)`.
+
 ## Fechas
 
 La conexión a MySQL va en UTC (`connectionTimeZone` en `application.yml`), igual que los `Instant` de

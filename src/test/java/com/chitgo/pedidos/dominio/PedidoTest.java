@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
 import com.chitgo.compartido.dominio.SolicitudInvalidaException;
@@ -52,6 +55,100 @@ class PedidoTest {
     void un_pedido_en_preparacion_no_se_cancela() {
         Pedido p = pedido(EstadoPedido.EN_PREPARACION);
         assertThrows(ReglaDeNegocioException.class, () -> p.cancelarPorCliente(T));
+    }
+
+    // Sin mensaje = se cancela. Con mensaje = 409 con ese texto y el pedido queda como estaba.
+    @ParameterizedTest(name = "{0} desde {1}")
+    @CsvSource(delimiter = '|', textBlock = """
+            CLIENTE          | PENDIENTE_APROBACION |
+            CLIENTE          | APROBADO             | El pedido ya fue aprobado. Si necesitás cambiarlo, llamá al mozo.
+            CLIENTE          | EN_PREPARACION       | El pedido ya se está preparando y no se puede cancelar
+            CLIENTE          | LISTO                | El pedido ya no se puede cancelar
+            CLIENTE          | SERVIDO              | El pedido ya no se puede cancelar
+            CLIENTE          | RECHAZADO            | El pedido ya fue rechazado
+            CLIENTE          | CANCELADO            | El pedido ya fue cancelado
+            CAJA             | PENDIENTE_APROBACION |
+            CAJA             | APROBADO             |
+            CAJA             | EN_PREPARACION       | El pedido ya se está preparando y no se puede cancelar
+            CAJA             | LISTO                | El pedido ya no se puede cancelar
+            CAJA             | SERVIDO              | El pedido ya no se puede cancelar
+            CAJA             | RECHAZADO            | El pedido ya no se puede cancelar
+            CAJA             | CANCELADO            | El pedido ya fue cancelado
+            CIERRE_DE_CUENTA | PENDIENTE_APROBACION |
+            CIERRE_DE_CUENTA | APROBADO             |
+            CIERRE_DE_CUENTA | EN_PREPARACION       |
+            CIERRE_DE_CUENTA | LISTO                |
+            CIERRE_DE_CUENTA | SERVIDO              | El pedido ya no se puede cancelar
+            CIERRE_DE_CUENTA | RECHAZADO            | El pedido ya no se puede cancelar
+            CIERRE_DE_CUENTA | CANCELADO            | El pedido ya fue cancelado
+            """)
+    void cada_origen_cancela_solo_desde_sus_estados(OrigenDeCancelacion origen, EstadoPedido estado, String mensaje) {
+        Pedido p = pedido(estado);
+        Long usuarioId = origen == OrigenDeCancelacion.CLIENTE ? null : 6L;
+        if (mensaje == null) {
+            p.cancelar(origen, usuarioId, T);
+            assertEquals(EstadoPedido.CANCELADO, p.getEstado());
+        } else {
+            ReglaDeNegocioException e = assertThrows(ReglaDeNegocioException.class,
+                    () -> p.cancelar(origen, usuarioId, T));
+            assertEquals(mensaje, e.getMessage());
+            assertEquals(estado, p.getEstado());
+            assertNull(p.getCanceladoEn());
+            assertNull(p.getCanceladoPorUsuarioId());
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrigenDeCancelacion.class, names = {"CAJA", "CIERRE_DE_CUENTA"})
+    void caja_cancela_y_queda_quien_y_cuando(OrigenDeCancelacion origen) {
+        Pedido p = pedido(EstadoPedido.APROBADO);
+        p.cancelar(origen, 6L, T.plusSeconds(90));
+        assertEquals(EstadoPedido.CANCELADO, p.getEstado());
+        assertEquals(6L, p.getCanceladoPorUsuarioId());
+        assertEquals(T.plusSeconds(90), p.getCanceladoEn());
+    }
+
+    @Test
+    void el_cliente_cancela_con_el_origen_y_queda_sin_usuario() {
+        Pedido p = pedido(EstadoPedido.PENDIENTE_APROBACION);
+        p.cancelar(OrigenDeCancelacion.CLIENTE, null, T.plusSeconds(30));
+        assertEquals(EstadoPedido.CANCELADO, p.getEstado());
+        assertEquals(T.plusSeconds(30), p.getCanceladoEn());
+        assertNull(p.getCanceladoPorUsuarioId());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrigenDeCancelacion.class, names = {"CAJA", "CIERRE_DE_CUENTA"})
+    void caja_sin_usuario_es_un_error_de_programacion(OrigenDeCancelacion origen) {
+        Pedido p = pedido(EstadoPedido.PENDIENTE_APROBACION);
+        assertThrows(IllegalArgumentException.class, () -> p.cancelar(origen, null, T));
+        assertEquals(EstadoPedido.PENDIENTE_APROBACION, p.getEstado());
+    }
+
+    @Test
+    void el_cliente_con_usuario_o_sin_origen_es_un_error_de_programacion() {
+        Pedido p = pedido(EstadoPedido.PENDIENTE_APROBACION);
+        assertThrows(IllegalArgumentException.class, () -> p.cancelar(OrigenDeCancelacion.CLIENTE, 6L, T));
+        assertThrows(IllegalArgumentException.class, () -> p.cancelar(null, 6L, T));
+        assertEquals(EstadoPedido.PENDIENTE_APROBACION, p.getEstado());
+    }
+
+    @Test
+    void cancelar_por_cliente_da_lo_mismo_que_antes_en_cada_estado() {
+        for (EstadoPedido estado : EstadoPedido.values()) {
+            Pedido p = pedido(estado);
+            if (estado == EstadoPedido.PENDIENTE_APROBACION) {
+                p.cancelarPorCliente(T);
+                assertEquals(EstadoPedido.CANCELADO, p.getEstado());
+                assertNull(p.getCanceladoPorUsuarioId());
+            } else {
+                String esperado = p.mensajeNoCancelable();
+                ReglaDeNegocioException e = assertThrows(ReglaDeNegocioException.class,
+                        () -> p.cancelarPorCliente(T));
+                assertEquals(esperado, e.getMessage(), estado.name());
+                assertEquals(estado, p.getEstado());
+            }
+        }
     }
 
     @Test
