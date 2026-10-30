@@ -8,10 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -24,9 +27,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import com.chitgo.compartido.dominio.AccesoDenegadoException;
+import com.chitgo.compartido.dominio.ConflictoDeConcurrenciaException;
 import com.chitgo.compartido.dominio.RelojDePrueba;
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
 import com.chitgo.menu.dominio.CategoriaMenu;
@@ -179,6 +184,7 @@ class EnviarPedidoServiceTest {
 
         assertEquals(EstadoCuenta.ABIERTA, cuenta.getEstado());
         verify(cuentas).guardar(cuenta);
+        verify(cuentas, never()).subirVersion(any());
         verify(eventos, times(2)).aCaja(eq(1L), any(EventoTiempoReal.class)); // cuenta reabierta + pedido enviado
     }
 
@@ -194,5 +200,93 @@ class EnviarPedidoServiceTest {
                 () -> new ItemSolicitado(1L, 0, null));
         assertThrows(com.chitgo.compartido.dominio.SolicitudInvalidaException.class,
                 () -> new ItemSolicitado(1L, 1, "x".repeat(201)));
+    }
+
+    // ----- el pedido que entra mientras se cierra la cuenta (opción A, 30/10) -----
+
+    @Test
+    void con_la_cuenta_abierta_se_sube_la_version_antes_de_guardar_el_pedido_y_no_se_guarda_la_cuenta() {
+        servicio.enviar(TOKEN, UUID.randomUUID(), milanesasYFlan());
+
+        InOrder orden = inOrder(cuentas, pedidos);
+        orden.verify(cuentas).subirVersion(cuenta);
+        orden.verify(pedidos).guardar(any(Pedido.class));
+        verify(cuentas, never()).guardar(any());
+        assertEquals(EstadoCuenta.ABIERTA, cuenta.getEstado());
+        verify(eventos, times(1)).aCaja(eq(1L), any(EventoTiempoReal.class)); // solo PEDIDO_ENVIADO
+    }
+
+    @Test
+    void con_la_cuenta_solicitada_se_guarda_antes_del_pedido_y_no_se_sube_la_version_aparte() {
+        con(cuenta, "estado", EstadoCuenta.SOLICITADA);
+
+        servicio.enviar(TOKEN, UUID.randomUUID(), milanesasYFlan());
+
+        InOrder orden = inOrder(cuentas, pedidos);
+        orden.verify(cuentas).guardar(cuenta);
+        orden.verify(pedidos).guardar(any(Pedido.class));
+        verify(cuentas, never()).subirVersion(any());
+    }
+
+    @Test
+    void un_reintento_con_el_mismo_uuid_no_toca_la_cuenta() {
+        UUID uuid = UUID.randomUUID();
+        Pedido existente = conId(new Pedido(1L, cuenta, sesion, uuid.toString(), AHORA), 5L);
+        when(pedidos.buscarPorUuidCliente(uuid.toString())).thenReturn(Optional.of(existente));
+
+        servicio.enviar(TOKEN, uuid, milanesasYFlan());
+
+        verifyNoInteractions(cuentas);
+    }
+
+    @Test
+    void con_la_cuenta_cerrada_no_se_toca_la_version_ni_se_guarda_nada() {
+        con(cuenta, "estado", EstadoCuenta.CERRADA);
+
+        assertThrows(ReglaDeNegocioException.class, () -> servicio.enviar(TOKEN, UUID.randomUUID(), milanesasYFlan()));
+
+        verifyNoInteractions(cuentas);
+        verify(pedidos, never()).guardar(any());
+    }
+
+    @Test
+    void si_el_cierre_gano_el_choque_de_la_cuenta_sin_pedido_con_ese_uuid_es_409_y_no_se_guarda_ni_avisa_nada() {
+        doThrow(new ConflictoDeConcurrenciaException("La cuenta cambió justo antes")).when(cuentas).subirVersion(cuenta);
+
+        ConflictoDeConcurrenciaException e = assertThrows(ConflictoDeConcurrenciaException.class,
+                () -> servicio.enviar(TOKEN, UUID.randomUUID(), milanesasYFlan()));
+
+        assertEquals("La cuenta cambió justo antes", e.getMessage());
+        verify(pedidos, never()).guardar(any());
+        verify(eventos, never()).aCaja(any(), any());
+    }
+
+    @Test
+    void si_el_choque_fue_de_un_envio_igual_a_la_vez_el_segundo_recibe_el_pedido_que_gano_con_200() {
+        UUID uuid = UUID.randomUUID();
+        Pedido ganador = conId(new Pedido(1L, cuenta, sesion, uuid.toString(), AHORA), 5L);
+        AtomicInteger busquedas = new AtomicInteger();
+        when(pedidos.buscarPorUuidCliente(uuid.toString()))
+                .thenAnswer(inv -> busquedas.getAndIncrement() == 0 ? Optional.empty() : Optional.of(ganador));
+        doThrow(new ConflictoDeConcurrenciaException("La cuenta cambió justo antes")).when(cuentas).subirVersion(cuenta);
+
+        ResultadoDeEnvio resultado = servicio.enviar(TOKEN, uuid, milanesasYFlan());
+
+        assertFalse(resultado.creado());
+        assertEquals(5L, resultado.pedido().id());
+        verify(eventos, never()).aCaja(any(), any());
+    }
+
+    @Test
+    void si_el_pedido_que_gano_es_de_otra_sesion_el_choque_termina_en_403() {
+        UUID uuid = UUID.randomUUID();
+        ClienteSesion otra = conId(new ClienteSesion(1L, cuenta, "token-de-B", true), 11L);
+        Pedido ganador = conId(new Pedido(1L, cuenta, otra, uuid.toString(), AHORA), 5L);
+        AtomicInteger busquedas = new AtomicInteger();
+        when(pedidos.buscarPorUuidCliente(uuid.toString()))
+                .thenAnswer(inv -> busquedas.getAndIncrement() == 0 ? Optional.empty() : Optional.of(ganador));
+        doThrow(new ConflictoDeConcurrenciaException("La cuenta cambió justo antes")).when(cuentas).subirVersion(cuenta);
+
+        assertThrows(AccesoDenegadoException.class, () -> servicio.enviar(TOKEN, uuid, milanesasYFlan()));
     }
 }

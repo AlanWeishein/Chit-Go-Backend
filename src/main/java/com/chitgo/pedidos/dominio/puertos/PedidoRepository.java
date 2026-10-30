@@ -1,5 +1,6 @@
 package com.chitgo.pedidos.dominio.puertos;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +23,9 @@ public interface PedidoRepository {
 
     /** Los de la cuenta, con sus ítems, del más viejo al más nuevo. */
     List<Pedido> listarDeLaCuenta(Long cuentaId);
+
+    /** Los de todas esas cuentas, con sus ítems, en una sola consulta (cuentas por cobrar, HU-10). */
+    List<Pedido> listarDeLasCuentas(Collection<Long> cuentaIds);
 
     /** Aprobados, en preparación y listos del local, con la cuenta, la mesa y los ítems. */
     List<Pedido> listarActivosDeCocina(Long localId);

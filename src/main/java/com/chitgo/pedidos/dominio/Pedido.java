@@ -272,6 +272,19 @@ public class Pedido {
         return estado == EstadoPedido.CANCELADO ? "El pedido ya fue cancelado" : "El pedido ya fue resuelto";
     }
 
+    /**
+     * Sin servir es lo que no está Servido, Rechazado ni Cancelado: lo que el cierre de la cuenta cancela (20/10).
+     * Coincide con los estados desde los que cancela CIERRE_DE_CUENTA, y por eso se apoya en ellos.
+     */
+    public boolean estaSinServir() {
+        return OrigenDeCancelacion.CIERRE_DE_CUENTA.permite(estado);
+    }
+
+    /** Suma al total de la cuenta todo lo que no quedó Rechazado ni Cancelado (CP-22-02). */
+    public boolean cuentaEnElTotal() {
+        return estado != EstadoPedido.RECHAZADO && estado != EstadoPedido.CANCELADO;
+    }
+
     /** Suma de cantidad por precio unitario de cada ítem (el precio del momento del pedido). */
     public BigDecimal total() {
         return items.stream()
