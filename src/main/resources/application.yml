@@ -31,3 +31,8 @@ chitgo:
     # Secure en la cookie de sesión y en la de CSRF. El perfil dev la apaga para entrar por http
     # desde el celular con la IP de la compu.
     cookie-segura: ${COOKIE_SEGURA:true}
+  alertas:
+    demora:
+      # La tarea que manda ALERTA_DEMORA a Caja cada 5 segundos (HU-08). Los tests la apagan en
+      # src/test/resources/config/application.yml.
+      habilitada: true

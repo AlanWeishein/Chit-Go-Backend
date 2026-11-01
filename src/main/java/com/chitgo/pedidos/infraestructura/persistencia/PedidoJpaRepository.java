@@ -1,5 +1,6 @@
 package com.chitgo.pedidos.infraestructura.persistencia;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -40,4 +41,12 @@ interface PedidoJpaRepository extends JpaRepository<Pedido, Long> {
             + "WHERE p.localId = :localId AND p.estado = :estado "
             + "ORDER BY p.enviadoEn, p.id, i.id")
     List<FilaPorAprobar> pendientesConPlatos(@Param("localId") Long localId, @Param("estado") EstadoPedido estado);
+
+    /** La alerta de los 3 minutos (HU-08): de todos los locales, en la ventana (despuesDe, hasta], sin ítems. */
+    @Query("SELECT new com.chitgo.pedidos.infraestructura.persistencia.FilaPendiente(p.id, p.localId, c.mesa.id) "
+            + "FROM Pedido p JOIN p.cuenta c "
+            + "WHERE p.estado = :estado AND p.enviadoEn > :despuesDe AND p.enviadoEn <= :hasta "
+            + "ORDER BY p.enviadoEn, p.id")
+    List<FilaPendiente> pendientesEnviadosEntre(@Param("estado") EstadoPedido estado,
+                                                @Param("despuesDe") Instant despuesDe, @Param("hasta") Instant hasta);
 }

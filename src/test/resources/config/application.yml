@@ -1,0 +1,8 @@
+# Solo para los tests. Va en config/ y no en la raíz para no tapar el application.yml de main: Spring Boot
+# carga los dos y este pisa lo que repite.
+chitgo:
+  alertas:
+    demora:
+      # La tarea programada de HU-08 no corre en la suite: los tests llaman a revisarDemorados() a mano.
+      # AlertaDeDemoraProgramadaTest la prende para ver que queda agendada.
+      habilitada: false
