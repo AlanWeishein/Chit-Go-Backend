@@ -354,6 +354,14 @@ reimpresión del ticket.
 local y el CSRF). Dos pasos van por SQL porque el back todavía no los tiene: servir un pedido (HU-05) y pedir la
 cuenta (el cliente).
 
+## Sprint 2: tareas de German
+
+Implementados HU-03 (llamados y cuenta), HU-05 (mesas, avisos, servido y Web Push), prioridad manual de
+HU-08 y cancelación individual/en lote de HU-09. Contrato, ejemplos, configuración Push y estado de
+validación en [docs/sprint-2-german.md](docs/sprint-2-german.md).
+
+La integración con MySQL y las pruebas desde celulares quedan pendientes por pedido del equipo.
+
 ## Fechas
 
 La conexión a MySQL va en UTC (`connectionTimeZone` en `application.yml`), igual que los `Instant` de

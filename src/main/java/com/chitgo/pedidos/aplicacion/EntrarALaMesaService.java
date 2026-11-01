@@ -150,7 +150,7 @@ public class EntrarALaMesaService {
         Cuenta cuenta = cuentas.guardar(new Cuenta(mesa.getLocalId(), mesa, mozo.orElse(null), ahora));
         if (mozo.isEmpty()) {
             // La cuenta se abre igual y se avisa a Caja o al Admin (decidido el 06/10).
-            avisos.guardar(new Aviso(mesa.getLocalId(), mesa, TipoAviso.MESA_SIN_MOZO));
+            avisos.guardar(new Aviso(cuenta, TipoAviso.MESA_SIN_MOZO, ahora));
             eventos.aAlertas(mesa.getLocalId(), EventoTiempoReal.de(TipoEvento.MESA_SIN_MOZO, null, mesa.getId(),
                     null, "La mesa " + mesa.getNumero() + " no tiene mozo de turno", ahora));
         }

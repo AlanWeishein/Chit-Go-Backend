@@ -170,7 +170,6 @@ public class Pedido {
     }
 
     // ----- máquina de estados: las reglas viven acá -----
-    // Servir lo suma quien haga HU-05, en esta misma clase.
 
     /** Caja aprueba (HU-07): solo un pedido pendiente. Queda quién lo resolvió y a qué hora. */
     public void aprobar(Long usuarioId, Instant ahora) {
@@ -243,6 +242,29 @@ public class Pedido {
         }
         estado = EstadoPedido.LISTO;
         listoEn = ahora;
+    }
+
+    /** HU-05: solo se sirve un pedido que Cocina dejó listo. */
+    public void servir(Long usuarioId, Instant ahora) {
+        if (estado != EstadoPedido.LISTO) {
+            throw new ReglaDeNegocioException("Solo se puede servir un pedido listo");
+        }
+        if (usuarioId == null || ahora == null) {
+            throw new IllegalArgumentException("Faltan el mozo o la hora del servido");
+        }
+        estado = EstadoPedido.SERVIDO;
+        servidoPorUsuarioId = usuarioId;
+        servidoEn = ahora;
+    }
+
+    /** HU-08: la prioridad solo cambia mientras el pedido espera en la cola de Cocina. */
+    public boolean cambiarPrioridad(boolean prioridad) {
+        if (estado != EstadoPedido.APROBADO) {
+            throw new ReglaDeNegocioException("Solo se puede cambiar la prioridad de un pedido en la cola de cocina");
+        }
+        boolean cambio = prioridadManual != prioridad;
+        prioridadManual = prioridad;
+        return cambio;
     }
 
     /** Qué le dice al cliente si ya no puede cancelar, según el estado en que está el pedido. */

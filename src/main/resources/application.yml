@@ -23,6 +23,12 @@ server:
   port: 8080
 
 chitgo:
+  push:
+    habilitado: ${PUSH_HABILITADO:false}
+    clave-publica: ${PUSH_CLAVE_PUBLICA:}
+    clave-privada: ${PUSH_CLAVE_PRIVADA:}
+    contacto: ${PUSH_CONTACTO:}
+    hosts-permitidos: ${PUSH_HOSTS_PERMITIDOS:fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com}
   jwt:
     # Clave para firmar el JWT de la sesión, en Base64 (32 bytes o más). Sin valor por defecto a
     # propósito: si falta, el back usa una clave al azar y avisa en el log (ver .env.example).
