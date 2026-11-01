@@ -190,8 +190,8 @@ dan 401 y con otro rol, 403. Los errores salen en ProblemDetail y el `detail` se
 
   - `mesa` es el número que se muestra, no el id.
   - `segundosDeEspera` y `demorado` los calcula el back con su reloj, en el momento del `GET`. `demorado` es
-    más de 3 minutos: a los 180 segundos todavía no, a los 181 sí. El aviso en vivo (`ALERTA_DEMORA`) es de
-    HU-08, en el Sprint 2.
+    más de 3 minutos: a los 180 segundos todavía no, a los 181 sí. El aviso en vivo está en "Alerta de los
+    3 minutos".
   - `disponible: false` quiere decir que el plato se apagó después de que el cliente lo pidió. No van precios.
 - `POST /api/v1/caja/pedidos/{id}/aprobar`, sin body. Responde 204.
 - `POST /api/v1/caja/pedidos/{id}/rechazar` con `{"motivo": "MESA_NO_OCUPADA"}`. Los motivos son
@@ -215,6 +215,32 @@ dan 401 y con otro rol, 403. Los errores salen en ProblemDetail y el `detail` se
 
 - Los eventos que se pierden con el WebSocket caído no se repiten: al reconectar, volver a pedir el `GET`.
 - Lo prueba `AprobacionDePedidosTest`, contra el MySQL del Compose.
+
+## Alerta de los 3 minutos (para el front)
+
+HU-08, pantalla P-08. Cuando un pedido pasa los 3 minutos sin que Caja lo apruebe o lo rechace, el back publica
+`ALERTA_DEMORA` en `/topic/local/{localId}/caja/pedidos`, el mismo topic de la cola. La regla es la del
+`demorado` del `GET`: a los 180 segundos todavía no, a los 181 sí.
+
+```json
+{"tipo": "ALERTA_DEMORA", "pedidoId": 12, "mesaId": 1, "cuentaId": null, "estado": "PENDIENTE_APROBACION",
+ "detalle": null, "ocurridoEn": "2026-10-21T23:03:05Z"}
+```
+
+- `mesaId` es el id de la mesa, como en los demás eventos. El número que se muestra está en el `mesa` del `GET`.
+- `ocurridoEn` es la hora en que el back lo detectó, no la hora del envío del pedido: la espera sale del
+  `enviadoEn` del `GET`.
+- Llega **una sola vez por pedido**. Si el pedido se aprueba, se rechaza o se cancela antes, no llega.
+- Lo publica una tarea que corre cada 5 segundos, así que puede llegar hasta unos 5 segundos después de los 181.
+- **Se puede perder**: si el back se reinicia justo cuando el pedido cruza los 3 minutos, o si el WebSocket está
+  caído en ese momento. Por eso, al conectar o reconectar, la verdad es el `demorado` del `GET`: con el aviso se
+  marca el pedido que ya está en pantalla, y el `GET` trae los que ya estaban demorados.
+- Un pedido que ya estaba demorado cuando arrancó el back no recibe aviso: sale `demorado` en el `GET`.
+- Cada local recibe solo los avisos de sus pedidos.
+- La tarea se prende y se apaga con `chitgo.alertas.demora.habilitada` (`true` en `application.yml`). Los tests la
+  apagan en `src/test/resources/config/application.yml` y llaman a la revisión a mano con el reloj de prueba.
+- Lo prueban `AlertaDeDemoraTest` (CP-20-01 a CP-20-04, contra el MySQL del Compose) y
+  `AlertaDeDemoraProgramadaTest` (que la tarea quede agendada cada 5 segundos).
 
 ## Cancelar un pedido
 
