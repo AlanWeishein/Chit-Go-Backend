@@ -108,6 +108,16 @@ public class Cuenta {
         return estado != EstadoCuenta.CERRADA;
     }
 
+    /** El cliente pide la cuenta una sola vez, hasta que un pedido nuevo la reabre. */
+    public void solicitar(Instant ahora) {
+        exigirNoCerrada();
+        if (estado == EstadoCuenta.SOLICITADA) {
+            throw new ReglaDeNegocioException("La cuenta ya fue solicitada");
+        }
+        estado = EstadoCuenta.SOLICITADA;
+        solicitadaEn = ahora;
+    }
+
     /**
      * Con la cuenta solicitada se puede seguir pidiendo hasta que se emita el ticket: un pedido nuevo la
      * vuelve a Abierta (06/10). Devuelve si hubo cambio.

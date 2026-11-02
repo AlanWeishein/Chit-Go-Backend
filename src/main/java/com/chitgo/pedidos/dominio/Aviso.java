@@ -12,7 +12,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import org.hibernate.annotations.CreationTimestamp;
+import jakarta.persistence.Version;
+import com.chitgo.compartido.dominio.ReglaDeNegocioException;
 
 /** Llamado de una mesa: llamar al mozo, cuenta solicitada o mesa sin mozo. */
 @Entity
@@ -25,15 +26,19 @@ public class Aviso {
 
     private Long localId;
 
+    private Long cuentaId;
+
+    @Version
+    private Integer version;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     private Mesa mesa;
 
     @Enumerated(EnumType.STRING)
     private TipoAviso tipo;
 
-    @CreationTimestamp
     @Column(updatable = false)
-    private Instant creadoEn;
+    private Instant creadoEn = Instant.now();
 
     private Long atendidoPorUsuarioId;
 
@@ -46,6 +51,27 @@ public class Aviso {
         this.localId = localId;
         this.mesa = mesa;
         this.tipo = tipo;
+    }
+
+    public Aviso(Cuenta cuenta, TipoAviso tipo, Instant ahora) {
+        this(cuenta.getLocalId(), cuenta.getMesa(), tipo);
+        this.cuentaId = cuenta.getId();
+        this.creadoEn = ahora;
+    }
+
+    public Long getCuentaId() {
+        return cuentaId;
+    }
+
+    public void atender(Long usuarioId, Instant ahora) {
+        if (atendidoEn != null) {
+            throw new ReglaDeNegocioException("El aviso ya fue atendido");
+        }
+        if (usuarioId == null || ahora == null) {
+            throw new IllegalArgumentException("Faltan el mozo o la hora de atención");
+        }
+        atendidoPorUsuarioId = usuarioId;
+        atendidoEn = ahora;
     }
 
     public Long getId() {

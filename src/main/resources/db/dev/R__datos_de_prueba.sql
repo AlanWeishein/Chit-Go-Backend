@@ -62,6 +62,7 @@
 SET FOREIGN_KEY_CHECKS = 0;
 
 DELETE FROM registro_auditoria;
+DELETE FROM suscripcion_push;
 DELETE FROM aviso;
 DELETE FROM ticket;
 DELETE FROM item_pedido;
@@ -81,6 +82,7 @@ DELETE FROM usuario;
 DELETE FROM local;
 
 ALTER TABLE registro_auditoria AUTO_INCREMENT = 1;
+ALTER TABLE suscripcion_push AUTO_INCREMENT = 1;
 ALTER TABLE aviso AUTO_INCREMENT = 1;
 ALTER TABLE ticket AUTO_INCREMENT = 1;
 ALTER TABLE item_pedido AUTO_INCREMENT = 1;

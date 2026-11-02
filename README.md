@@ -473,6 +473,14 @@ Los cambios no se avisan en vivo: el cliente los ve la próxima vez que carga la
 - `CartaDelAdminTest` recorre HU-12 contra el MySQL del Compose (CP-25-01 a CP-25-08, menos CP-25-06, que es de
   la ST-12), con el login del Admin de verdad y la carta del cliente por el QR de la mesa 1.
 
+## Sprint 2: tareas de German
+
+Implementados HU-03 (llamados y cuenta), HU-05 (mesas, avisos, servido y Web Push), prioridad manual de
+HU-08 y cancelación individual/en lote de HU-09. Contrato, ejemplos, configuración Push y estado de
+validación en [docs/sprint-2-german.md](docs/sprint-2-german.md).
+
+La integración con MySQL y las pruebas desde celulares quedan pendientes por pedido del equipo.
+
 ## Fechas
 
 La conexión a MySQL va en UTC (`connectionTimeZone` en `application.yml`), igual que los `Instant` de
