@@ -77,7 +77,7 @@ class AlertaDeDemoraServiceTest {
     }
 
     private static EventoTiempoReal alertaALas200301(Long pedidoId, Long mesaId) {
-        return new EventoTiempoReal(TipoEvento.ALERTA_DEMORA, pedidoId, mesaId, null, "PENDIENTE_APROBACION", null,
+        return new EventoTiempoReal(TipoEvento.ALERTA_DEMORA, pedidoId, mesaId, null, null, "PENDIENTE_APROBACION", null,
                 "2026-10-20T20:03:01Z");
     }
 

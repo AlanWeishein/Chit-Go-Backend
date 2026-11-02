@@ -22,7 +22,7 @@ class DestinatariosPushServiceTest {
     private final DestinatariosPushService servicio = new DestinatariosPushService(cuentas, pedidos, asignaciones, suscripciones);
     private final Mesa mesa = conId(new Mesa(1L, "1", "qr"), 1L);
     private final Cuenta cuenta = conId(new Cuenta(1L, mesa, 3L, AHORA), 10L);
-    private final EventoTiempoReal evento = new EventoTiempoReal(TipoEvento.AVISO_CREADO, null, 1L, 10L,
+    private final EventoTiempoReal evento = new EventoTiempoReal(TipoEvento.AVISO_CREADO, null, 1L, 10L, null,
             "ABIERTA", "LLAMAR_MOZO", AHORA.toString());
 
     @Test

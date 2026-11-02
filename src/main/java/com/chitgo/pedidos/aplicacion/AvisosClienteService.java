@@ -73,7 +73,8 @@ public class AvisosClienteService {
         Instant ahora = reloj.ahora();
         Aviso aviso = avisos.guardar(new Aviso(cuenta, tipo, ahora));
         eventos.aMozos(cuenta.getLocalId(), new EventoTiempoReal(TipoEvento.AVISO_CREADO, null,
-                cuenta.getMesa().getId(), cuenta.getId(), cuenta.getEstado().name(), tipo.name(), ahora.toString()));
+                cuenta.getMesa().getId(), cuenta.getId(), null, cuenta.getEstado().name(), tipo.name(),
+                ahora.toString()));
         return new AvisoDto(aviso.getId(), cuenta.getMesa().getId(), cuenta.getMesa().getNumero(),
                 tipo.name(), aviso.getCreadoEn(), null, null);
     }

@@ -29,6 +29,7 @@ import com.chitgo.menu.aplicacion.dto.CambioDeDisponibilidadDto;
 import com.chitgo.menu.aplicacion.dto.PlatoDisponibilidadDto;
 import com.chitgo.menu.dominio.CategoriaMenu;
 import com.chitgo.menu.dominio.Plato;
+import com.chitgo.menu.dominio.puertos.AvisoDeDisponibilidad;
 import com.chitgo.menu.dominio.puertos.PedidosConPlato;
 import com.chitgo.menu.dominio.puertos.PedidosConPlato.PedidoAfectado;
 import com.chitgo.menu.dominio.puertos.PedidosConPlato.PlatoDelPedido;
@@ -44,6 +45,7 @@ class CambiarDisponibilidadServiceTest {
 
     private final PlatoRepository platos = mock(PlatoRepository.class);
     private final PedidosConPlato pedidosConPlato = mock(PedidosConPlato.class);
+    private final AvisoDeDisponibilidad aviso = mock(AvisoDeDisponibilidad.class);
     private final Auditor auditor = mock(Auditor.class);
     private final CategoriaMenu principales = conId(new CategoriaMenu(1L, "Principales", (short) 1), 1L);
     private final CategoriaMenu postres = conId(new CategoriaMenu(1L, "Postres", (short) 2), 2L);
@@ -60,14 +62,14 @@ class CambiarDisponibilidadServiceTest {
 
     @BeforeEach
     void preparar() {
-        servicio = new CambiarDisponibilidadService(platos, pedidosConPlato, auditor);
+        servicio = new CambiarDisponibilidadService(platos, pedidosConPlato, aviso, auditor);
         when(platos.buscarPorId(1L, 1L)).thenReturn(Optional.of(milanesa));
         when(platos.guardar(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
         when(pedidosConPlato.afectadosPor(1L, 1L)).thenReturn(tresConMilanesa);
     }
 
     @Test
-    void apagar_el_plato_guarda_audita_y_devuelve_los_afectados() {
+    void apagar_el_plato_guarda_audita_avisa_y_devuelve_los_afectados() {
         CambioDeDisponibilidadDto respuesta = servicio.cambiar(CARLA, 1L, false);
 
         assertEquals(1L, respuesta.platoId());
@@ -77,6 +79,7 @@ class CambiarDisponibilidadServiceTest {
         verify(platos).guardar(milanesa);
         verify(auditor).registrar(1L, 3L, "CAMBIAR_DISPONIBILIDAD", "PLATO", 1L,
                 Map.of("disponible", true), Map.of("disponible", false));
+        verify(aviso).platoCambio(1L, 1L, false);
     }
 
     @Test
@@ -98,7 +101,7 @@ class CambiarDisponibilidadServiceTest {
     }
 
     @Test
-    void volver_a_disponible_audita_y_no_busca_afectados() {
+    void volver_a_disponible_audita_avisa_y_no_busca_afectados() {
         milanesa.cambiarDisponibilidad(false);
 
         CambioDeDisponibilidadDto respuesta = servicio.cambiar(CARLA, 1L, true);
@@ -109,11 +112,12 @@ class CambiarDisponibilidadServiceTest {
         verify(platos).guardar(milanesa);
         verify(auditor).registrar(1L, 3L, "CAMBIAR_DISPONIBILIDAD", "PLATO", 1L,
                 Map.of("disponible", false), Map.of("disponible", true));
+        verify(aviso).platoCambio(1L, 1L, true);
         verifyNoInteractions(pedidosConPlato);
     }
 
     @Test
-    void apagar_uno_ya_apagado_no_guarda_ni_audita_pero_trae_los_afectados_de_ahora() {
+    void apagar_uno_ya_apagado_no_guarda_audita_ni_avisa_pero_trae_los_afectados_de_ahora() {
         milanesa.cambiarDisponibilidad(false);
 
         CambioDeDisponibilidadDto respuesta = servicio.cambiar(CARLA, 1L, false);
@@ -121,17 +125,17 @@ class CambiarDisponibilidadServiceTest {
         assertFalse(respuesta.disponible());
         assertEquals(tresConMilanesa, respuesta.afectados());
         verify(platos, never()).guardar(any());
-        verifyNoInteractions(auditor);
+        verifyNoInteractions(auditor, aviso);
     }
 
     @Test
-    void prender_uno_ya_disponible_no_guarda_ni_audita() {
+    void prender_uno_ya_disponible_no_guarda_audita_ni_avisa() {
         CambioDeDisponibilidadDto respuesta = servicio.cambiar(CARLA, 1L, true);
 
         assertTrue(respuesta.disponible());
         assertTrue(respuesta.afectados().isEmpty());
         verify(platos, never()).guardar(any());
-        verifyNoInteractions(auditor, pedidosConPlato);
+        verifyNoInteractions(auditor, pedidosConPlato, aviso);
     }
 
     @Test
@@ -143,7 +147,7 @@ class CambiarDisponibilidadServiceTest {
 
         assertEquals("El plato no existe", e.getMessage());
         verify(platos, never()).guardar(any());
-        verifyNoInteractions(auditor, pedidosConPlato);
+        verifyNoInteractions(auditor, pedidosConPlato, aviso);
     }
 
     @Test
@@ -153,7 +157,7 @@ class CambiarDisponibilidadServiceTest {
         assertThrows(AccesoDenegadoException.class, () -> servicio.cambiar(gerente, 1L, false));
         assertThrows(AccesoDenegadoException.class, () -> servicio.listar(gerente));
         verify(platos, never()).buscarPorId(anyLong(), any());
-        verifyNoInteractions(auditor, pedidosConPlato);
+        verifyNoInteractions(auditor, pedidosConPlato, aviso);
     }
 
     @Test

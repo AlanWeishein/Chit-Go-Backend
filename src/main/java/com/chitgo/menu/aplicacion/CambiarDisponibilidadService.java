@@ -13,6 +13,7 @@ import com.chitgo.menu.aplicacion.dto.CambioDeDisponibilidadDto;
 import com.chitgo.menu.aplicacion.dto.PlatoDisponibilidadDto;
 import com.chitgo.menu.dominio.CategoriaMenu;
 import com.chitgo.menu.dominio.Plato;
+import com.chitgo.menu.dominio.puertos.AvisoDeDisponibilidad;
 import com.chitgo.menu.dominio.puertos.PedidosConPlato;
 import com.chitgo.menu.dominio.puertos.PedidosConPlato.PedidoAfectado;
 import com.chitgo.menu.dominio.puertos.PlatoRepository;
@@ -33,11 +34,14 @@ public class CambiarDisponibilidadService {
 
     private final PlatoRepository platos;
     private final PedidosConPlato pedidosConPlato;
+    private final AvisoDeDisponibilidad aviso;
     private final Auditor auditor;
 
-    public CambiarDisponibilidadService(PlatoRepository platos, PedidosConPlato pedidosConPlato, Auditor auditor) {
+    public CambiarDisponibilidadService(PlatoRepository platos, PedidosConPlato pedidosConPlato,
+                                        AvisoDeDisponibilidad aviso, Auditor auditor) {
         this.platos = platos;
         this.pedidosConPlato = pedidosConPlato;
+        this.aviso = aviso;
         this.auditor = auditor;
     }
 
@@ -48,8 +52,9 @@ public class CambiarDisponibilidadService {
     }
 
     /**
-     * Si el plato ya estaba así, no guarda ni audita, y responde igual con los afectados de ahora: un doble toque
-     * no deja dos registros (29/10). Al apagarlo, devuelve los pedidos que Caja puede cancelar; al prenderlo, ninguno.
+     * Si el plato ya estaba así, no guarda, no audita ni avisa, y responde igual con los afectados de ahora: un doble
+     * toque no deja dos registros ni dos avisos por celular (29/10). Al apagarlo, devuelve los pedidos que Caja puede
+     * cancelar; al prenderlo, ninguno.
      */
     @Transactional
     public CambioDeDisponibilidadDto cambiar(UsuarioAutenticado usuario, Long platoId, boolean disponible) {
@@ -61,6 +66,7 @@ public class CambiarDisponibilidadService {
             platos.guardar(plato);
             auditor.registrar(localId, usuario.usuarioId(), ACCION, ENTIDAD, plato.getId(),
                     Map.of("disponible", !disponible), Map.of("disponible", disponible));
+            aviso.platoCambio(localId, plato.getId(), disponible);
         }
         List<PedidoAfectado> afectados = disponible ? List.of() : pedidosConPlato.afectadosPor(plato.getId(), localId);
         return new CambioDeDisponibilidadDto(plato.getId(), plato.isActivo(), afectados);
