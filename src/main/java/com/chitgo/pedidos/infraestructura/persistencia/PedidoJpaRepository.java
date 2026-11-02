@@ -42,6 +42,20 @@ interface PedidoJpaRepository extends JpaRepository<Pedido, Long> {
             + "ORDER BY p.enviadoEn, p.id, i.id")
     List<FilaPorAprobar> pendientesConPlatos(@Param("localId") Long localId, @Param("estado") EstadoPedido estado);
 
+    /**
+     * Los pedidos del local en esos estados que tienen el plato, una fila por cada uno de sus ítems (también los de
+     * otros platos). Plato se une por platoId, como en la cola de Caja.
+     */
+    @Query("SELECT new com.chitgo.pedidos.infraestructura.persistencia.FilaAfectada("
+            + "p.id, m.numero, p.estado, i.platoId, pl.nombre, i.cantidad) "
+            + "FROM Pedido p JOIN p.cuenta c JOIN c.mesa m JOIN p.items i "
+            + "JOIN Plato pl ON pl.id = i.platoId AND pl.localId = p.localId "
+            + "WHERE p.localId = :localId AND p.estado IN :estados "
+            + "AND p.id IN (SELECT ic.pedido.id FROM ItemPedido ic WHERE ic.platoId = :platoId) "
+            + "ORDER BY p.enviadoEn, p.id, i.id")
+    List<FilaAfectada> conPlato(@Param("platoId") Long platoId, @Param("localId") Long localId,
+                                @Param("estados") Collection<EstadoPedido> estados);
+
     /** La alerta de los 3 minutos (HU-08): de todos los locales, en la ventana (despuesDe, hasta], sin ítems. */
     @Query("SELECT new com.chitgo.pedidos.infraestructura.persistencia.FilaPendiente(p.id, p.localId, c.mesa.id) "
             + "FROM Pedido p JOIN p.cuenta c "

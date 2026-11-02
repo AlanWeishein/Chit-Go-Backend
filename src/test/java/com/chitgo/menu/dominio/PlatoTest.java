@@ -187,6 +187,48 @@ class PlatoTest {
     }
 
     @Test
+    void apagarlo_lo_deja_no_disponible_y_avisa_que_cambio() {
+        Plato plato = milanesa();
+
+        assertTrue(plato.cambiarDisponibilidad(false));
+
+        assertFalse(plato.isActivo());
+    }
+
+    @Test
+    void prenderlo_otra_vez_lo_deja_disponible_y_avisa_que_cambio() {
+        Plato plato = milanesa();
+        plato.cambiarDisponibilidad(false);
+
+        assertTrue(plato.cambiarDisponibilidad(true));
+
+        assertTrue(plato.isActivo());
+    }
+
+    @Test
+    void repetir_el_estado_que_ya_tiene_no_cambia_nada() {
+        Plato plato = milanesa();
+        assertFalse(plato.cambiarDisponibilidad(true));
+        assertTrue(plato.isActivo());
+
+        plato.cambiarDisponibilidad(false);
+        assertFalse(plato.cambiarDisponibilidad(false));
+        assertFalse(plato.isActivo());
+    }
+
+    @Test
+    void cambiar_la_disponibilidad_no_toca_el_destacado_ni_los_datos_de_la_carta() {
+        Plato plato = milanesa();
+        plato.marcarDestacado(true);
+
+        plato.cambiarDisponibilidad(false);
+
+        assertTrue(plato.isDestacado());
+        assertEquals("Milanesa napolitana", plato.getNombre());
+        assertEquals(new BigDecimal("9500.00"), plato.getPrecio());
+    }
+
+    @Test
     void un_plato_sin_guardar_no_puede_llevar_etiquetas() {
         Plato plato = plato("Empanada", "1800", null);
 
