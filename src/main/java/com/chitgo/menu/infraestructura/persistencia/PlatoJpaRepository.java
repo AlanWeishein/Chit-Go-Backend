@@ -26,4 +26,9 @@ interface PlatoJpaRepository extends JpaRepository<Plato, Long> {
     List<Plato> todosConEtiquetas(@Param("localId") Long localId);
 
     Optional<Plato> findByIdAndLocalId(Long id, Long localId);
+
+    /** Por cada categoría con platos: su id, cuántos tiene y cuántos están fuera de carta. */
+    @Query("SELECT p.categoria.id, COUNT(p), SUM(CASE WHEN p.activo = FALSE THEN 1 ELSE 0 END) FROM Plato p "
+            + "WHERE p.localId = :localId GROUP BY p.categoria.id")
+    List<Object[]> contarPorCategoria(@Param("localId") Long localId);
 }
