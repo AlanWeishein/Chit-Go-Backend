@@ -380,6 +380,99 @@ reimpresión del ticket.
 local y el CSRF). Dos pasos van por SQL porque el back todavía no los tiene: servir un pedido (HU-05) y pedir la
 cuenta (el cliente).
 
+## Carta del Admin (para el front)
+
+HU-12, pantalla P-14. Todas las rutas piden sesión de Admin (el permiso `menu.gestionar`): sin sesión dan 401 y
+con otro rol, 403 "No tenés permiso para hacer esto.". Los `POST`, `PUT`, `PATCH` y `DELETE` llevan el header
+`X-XSRF-TOKEN` (ver "Sesión y CSRF"); sin él, 403. Los errores salen en ProblemDetail y el `detail` se puede
+mostrar tal cual. Un plato, una categoría o una etiqueta de otro local da el mismo 404 que uno que no existe,
+también cuando viene en el body.
+
+Los cambios no se avisan en vivo: el cliente los ve la próxima vez que carga la carta.
+
+### Platos
+
+- `GET /api/v1/admin/platos`: todos los platos del local, **también los fuera de carta** (`disponible: false`).
+  Vienen ordenados por el orden de la categoría y después por nombre, con las etiquetas por nombre:
+
+```json
+[
+  {"id": 2, "nombre": "Ensalada mixta", "descripcion": null, "precio": 6000.00,
+   "categoria": {"id": 1, "nombre": "Principales"}, "imagenUrl": "/img/ensalada.jpg",
+   "destacado": false, "disponible": true,
+   "etiquetas": [{"id": 1, "nombre": "Sin TACC"}, {"id": 2, "nombre": "Vegano"}]}
+]
+```
+
+- `POST /api/v1/admin/platos`: el alta. Nace disponible y sin destacar. Responde 201 con el plato, como en el `GET`:
+
+```json
+{"nombre": "Empanada de carne", "descripcion": "Cortada a cuchillo", "precio": 1800, "categoriaId": 3,
+ "imagenUrl": "/img/empanada.jpg", "etiquetaIds": [1]}
+```
+
+- `PUT /api/v1/admin/platos/{id}`: la edición, con el mismo body. Responde 200 con el plato. `destacado` y
+  `disponible` no se cambian acá.
+  - **Se manda el plato entero.** Las etiquetas se reemplazan por las de `etiquetaIds`: si el campo no viene o
+    viene `null`, el plato se queda sin etiquetas.
+- `PATCH /api/v1/admin/platos/{id}/destacado` con `{"destacado": true}`. Responde 204. Los destacados salen
+  arriba en la carta del cliente.
+- **No hay `DELETE` de platos.** Sacar un plato de la carta es lo mismo que dejarlo no disponible:
+  `PATCH /api/v1/platos/{id}/disponibilidad` (HU-09), que todavía no está en el back. El plato sigue en este
+  `GET`, con `disponible: false`.
+- Errores del alta y la edición:
+  - 400 "Poné un nombre": sin nombre o en blanco.
+  - 400 "El precio tiene que ser mayor a cero": sin precio, cero o negativo.
+  - 400 "La imagen tiene que ser un link https o una ruta del front" (ver abajo).
+  - 400 "Los datos enviados no son válidos.": nombre de más de 120 caracteres, descripción de más de 500,
+    precio con más de dos decimales o sin `categoriaId`.
+  - 404 "El plato no existe", "La categoría no existe" o "La etiqueta no existe".
+- **La imagen** es un link `https://...` o una ruta del propio front que empieza con `/` (por ejemplo
+  `/img/milanesa.jpg`, en la carpeta `public` del front), de hasta 255 caracteres. `http://` no va, porque el
+  navegador la bloquea en una página `https`, y tampoco una ruta que empieza con `//`, que lleva a otro sitio.
+  Vacía o `null` queda sin imagen. No se suben archivos.
+- El precio vuelve siempre con dos decimales (`1800` queda `1800.00`). Cambiarlo no toca los pedidos que ya
+  se mandaron: cada uno guarda el precio del momento.
+
+### Categorías
+
+- `GET /api/v1/admin/categorias`: las del local **en su orden**, con cuántos platos tiene cada una y cuántos
+  de esos están fuera de carta. La posición en la lista es el orden; no viene un campo `orden`:
+
+```json
+[
+  {"id": 1, "nombre": "Principales", "platos": 2, "fueraDeCarta": 0},
+  {"id": 2, "nombre": "Postres", "platos": 1, "fueraDeCarta": 1}
+]
+```
+
+- `POST /api/v1/admin/categorias` con `{"nombre": "Entradas"}`: va al final del orden. Responde 201.
+- `PUT /api/v1/admin/categorias/{id}` con `{"nombre": "..."}`: renombrar. Responde 200.
+- `PUT /api/v1/admin/categorias/orden` con `{"ids": [2, 1, 3]}`: el orden nuevo, **con todas las categorías del
+  local** y cada una una sola vez. Al arrastrar en P-14 se manda la lista entera. Responde 204. Si falta una,
+  sobra una o se repite, 400 "El orden tiene que traer todas las categorías del local, una vez cada una".
+- `DELETE /api/v1/admin/categorias/{id}`: solo si no tiene platos, contando los fuera de carta. Responde 204.
+  Con platos, 409 "La categoría tiene 3 platos (1 fuera de carta). Movelos a otra antes de borrarla".
+- Sin nombre, 400 "Poné un nombre"; de más de 80 caracteres, el 400 genérico.
+
+### Etiquetas
+
+- `GET /api/v1/admin/etiquetas`: las del local, por nombre, con `id` y `nombre`.
+- `POST /api/v1/admin/etiquetas` con `{"nombre": "Picante"}` (201) y `PUT /api/v1/admin/etiquetas/{id}` (200).
+- Repetida, al crear o al renombrar: 409 "Esa etiqueta ya existe". No distingue mayúsculas ni tildes: "Sin TACC",
+  "sin tacc" y "Sín TACC" son la misma.
+- `DELETE /api/v1/admin/etiquetas/{id}`: responde 204 y la etiqueta se va también de los platos que la tenían.
+- Sin nombre, 400 "Poné un nombre"; de más de 60 caracteres, el 400 genérico.
+
+### Auditoría y cómo se prueba
+
+- Cada cambio deja un registro: `CREAR_PLATO`, `EDITAR_PLATO`, `DESTACAR_PLATO`, `CREAR_CATEGORIA`,
+  `EDITAR_CATEGORIA`, `ORDENAR_CATEGORIAS`, `BORRAR_CATEGORIA`, `CREAR_ETIQUETA`, `EDITAR_ETIQUETA` y
+  `BORRAR_ETIQUETA`. `EDITAR_PLATO` lleva solo los campos que cambiaron, así que el historial de precio sale de
+  ahí. Un cambio que no cambia nada no audita.
+- `CartaDelAdminTest` recorre HU-12 contra el MySQL del Compose (CP-25-01 a CP-25-08, menos CP-25-06, que es de
+  la ST-12), con el login del Admin de verdad y la carta del cliente por el QR de la mesa 1.
+
 ## Sprint 2: tareas de German
 
 Implementados HU-03 (llamados y cuenta), HU-05 (mesas, avisos, servido y Web Push), prioridad manual de

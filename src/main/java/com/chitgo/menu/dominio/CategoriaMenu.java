@@ -6,7 +6,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Agrupa los platos de la carta de un local. */
+/** Agrupa los platos de la carta de un local. La carta las muestra por orden. */
 @Entity
 @Table(name = "categoria_menu")
 public class CategoriaMenu {
@@ -24,9 +24,20 @@ public class CategoriaMenu {
     protected CategoriaMenu() {
     }
 
+    /** Sin nombre, 400 "Poné un nombre". */
     public CategoriaMenu(Long localId, String nombre, short orden) {
         this.localId = localId;
-        this.nombre = nombre;
+        this.nombre = Nombres.obligatorio(nombre);
+        this.orden = orden;
+    }
+
+    /** HU-12. Sin nombre, 400 y no cambia. */
+    public void renombrar(String nombre) {
+        this.nombre = Nombres.obligatorio(nombre);
+    }
+
+    /** HU-12: el lugar en la carta, empezando por 1. */
+    public void moverA(short orden) {
         this.orden = orden;
     }
 
