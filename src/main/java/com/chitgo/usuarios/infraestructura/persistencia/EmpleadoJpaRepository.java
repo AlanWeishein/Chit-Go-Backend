@@ -3,6 +3,8 @@ package com.chitgo.usuarios.infraestructura.persistencia;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -12,6 +14,14 @@ import com.chitgo.usuarios.dominio.DiaSemana;
 import com.chitgo.usuarios.dominio.Empleado;
 
 interface EmpleadoJpaRepository extends JpaRepository<Empleado, Long> {
+
+    @Query("SELECT mm.id.mesaId FROM Empleado e JOIN e.mesasAsignadas mm "
+            + "WHERE e.usuario.id = :usuarioId AND e.localId = :localId AND mm.localId = :localId")
+    Set<Long> mesasDe(@Param("usuarioId") Long usuarioId, @Param("localId") Long localId);
+
+    @Query("SELECT e.usuario.id FROM Empleado e WHERE e.id = :empleadoId AND e.localId = :localId "
+            + "AND e.usuario.activo = TRUE AND e.usuario.rol.codigo = 'MOZO'")
+    Optional<Long> usuarioDelEmpleado(@Param("empleadoId") Long empleadoId, @Param("localId") Long localId);
 
     /**
      * Los empleados asignados a la mesa, activos, con un turno que cubre este día y esta hora y sin una

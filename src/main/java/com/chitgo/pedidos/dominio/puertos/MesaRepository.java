@@ -1,6 +1,7 @@
 package com.chitgo.pedidos.dominio.puertos;
 
 import java.util.Optional;
+import java.util.List;
 
 import com.chitgo.pedidos.dominio.Mesa;
 
@@ -13,4 +14,6 @@ public interface MesaRepository {
      * hacen de a uno y se abre una sola cuenta.
      */
     Optional<Mesa> buscarPorTokenQrParaAbrirCuenta(String tokenQr);
+
+    List<Mesa> listarDelLocal(Long localId);
 }

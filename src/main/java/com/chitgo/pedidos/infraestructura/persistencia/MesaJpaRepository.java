@@ -1,6 +1,7 @@
 package com.chitgo.pedidos.infraestructura.persistencia;
 
 import java.util.Optional;
+import java.util.List;
 
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +14,8 @@ import com.chitgo.pedidos.dominio.Mesa;
 interface MesaJpaRepository extends JpaRepository<Mesa, Long> {
 
     Optional<Mesa> findByTokenQr(String tokenQr);
+
+    List<Mesa> findByLocalIdOrderByNumeroAscIdAsc(Long localId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT m FROM Mesa m WHERE m.tokenQr = :tokenQr")

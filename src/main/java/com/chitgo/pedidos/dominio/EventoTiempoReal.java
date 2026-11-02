@@ -4,8 +4,8 @@ import java.time.Instant;
 
 /**
  * Payload de los avisos por WebSocket. Sin precios ni datos del personal (RF-31). La hora viaja como texto
- * ISO-8601 para no depender de cómo serialice fechas el conversor de mensajes. {@code cuentaId} solo lo traen
- * los eventos de la cuenta (CUENTA_CERRADA); en los de un pedido va en null.
+ * ISO-8601 para no depender de cómo serialice fechas el conversor de mensajes. {@code cuentaId} lo traen
+ * los eventos de la cuenta y los avisos; en los de un pedido va en null.
  */
 public record EventoTiempoReal(TipoEvento tipo, Long pedidoId, Long mesaId, Long cuentaId, String estado,
                                String detalle, String ocurridoEn) {
