@@ -73,7 +73,7 @@ public class Plato {
         asignar(categoria, nombre, descripcion, precio, imagenUrl);
     }
 
-    /** HU-12: cambia los datos de la carta. No toca activo (ST-12) ni destacado. Si algo no vale, no cambia nada. */
+    /** HU-12: cambia los datos de la carta. No toca activo (cambiarDisponibilidad) ni destacado. Si algo no vale, no cambia nada. */
     public void editar(CategoriaMenu categoria, String nombre, String descripcion, BigDecimal precio, String imagenUrl) {
         asignar(categoria, nombre, descripcion, precio, imagenUrl);
     }
@@ -81,6 +81,18 @@ public class Plato {
     /** RF-28: los destacados salen arriba en la carta del cliente. */
     public void marcarDestacado(boolean destacado) {
         this.destacado = destacado;
+    }
+
+    /**
+     * HU-09: no disponible y fuera de carta son lo mismo, la columna activo (09/10). Devuelve si cambió: repetir el
+     * estado que ya tiene no se guarda, no se audita ni se avisa (29/10).
+     */
+    public boolean cambiarDisponibilidad(boolean disponible) {
+        if (activo == disponible) {
+            return false;
+        }
+        this.activo = disponible;
+        return true;
     }
 
     /**

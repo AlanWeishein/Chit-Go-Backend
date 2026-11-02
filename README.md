@@ -418,8 +418,8 @@ Los cambios no se avisan en vivo: el cliente los ve la próxima vez que carga la
 - `PATCH /api/v1/admin/platos/{id}/destacado` con `{"destacado": true}`. Responde 204. Los destacados salen
   arriba en la carta del cliente.
 - **No hay `DELETE` de platos.** Sacar un plato de la carta es lo mismo que dejarlo no disponible:
-  `PATCH /api/v1/platos/{id}/disponibilidad` (HU-09), que todavía no está en el back. El plato sigue en este
-  `GET`, con `disponible: false`.
+  `PATCH /api/v1/platos/{id}/disponibilidad` (HU-09, ver "Disponibilidad"). El plato sigue en este `GET`, con
+  `disponible: false`.
 - Errores del alta y la edición:
   - 400 "Poné un nombre": sin nombre o en blanco.
   - 400 "El precio tiene que ser mayor a cero": sin precio, cero o negativo.
@@ -472,6 +472,73 @@ Los cambios no se avisan en vivo: el cliente los ve la próxima vez que carga la
   ahí. Un cambio que no cambia nada no audita.
 - `CartaDelAdminTest` recorre HU-12 contra el MySQL del Compose (CP-25-01 a CP-25-08, menos CP-25-06, que es de
   la ST-12), con el login del Admin de verdad y la carta del cliente por el QR de la mesa 1.
+
+## Disponibilidad (para el front)
+
+HU-09, pantallas P-10 (Caja) y P-14 (Admin). Apagar un plato y sacarlo de la carta son lo mismo: el plato deja de
+salir en el menú del cliente y los pedidos que ya lo tenían lo siguen mostrando (el ticket también). Las dos rutas
+piden el permiso `plato.cambiar_disponibilidad`, que tienen Caja y el Admin: sin sesión dan 401 y con otro rol
+(Cocina, el Mozo), 403 "No tenés permiso para hacer esto.". Los errores salen en ProblemDetail.
+
+- `GET /api/v1/platos`: los platos del local, **también los apagados**, en el orden de la carta (categoría y
+  después nombre). Es la lista de P-10; Caja no puede usar `GET /admin/platos`.
+
+```json
+[
+  {"id": 2, "nombre": "Ensalada mixta", "categoria": {"id": 1, "nombre": "Principales"}, "disponible": true},
+  {"id": 1, "nombre": "Milanesa napolitana", "categoria": {"id": 1, "nombre": "Principales"}, "disponible": false}
+]
+```
+
+- `PATCH /api/v1/platos/{id}/disponibilidad` con `{"disponible": false}` o `true`, y el header `X-XSRF-TOKEN`
+  (sin él, 403). Responde 200:
+
+```json
+{
+  "platoId": 1,
+  "disponible": false,
+  "afectados": [
+    {"id": 12, "mesa": "1", "estado": "PENDIENTE_APROBACION", "platos": [
+      {"platoId": 1, "nombre": "Milanesa napolitana", "cantidad": 2},
+      {"platoId": 3, "nombre": "Flan casero", "cantidad": 1}
+    ]},
+    {"id": 14, "mesa": "1", "estado": "APROBADO", "platos": [
+      {"platoId": 1, "nombre": "Milanesa napolitana", "cantidad": 1}
+    ]}
+  ]
+}
+```
+
+  - `afectados` son los pedidos del local con ese plato que todavía se pueden cancelar: `PENDIENTE_APROBACION`
+    y `APROBADO`, del más viejo al más nuevo. Con eso se arma el diálogo "Hay 2 pedidos con Milanesa
+    napolitana. ¿Los cancelamos?" sin pedir nada más. `mesa` es el número; `platos` trae **todos** los ítems
+    del pedido, no solo el plato apagado. Los que están En preparación no salen: siguen en el KDS.
+  - Con `disponible: true`, `afectados` va vacío.
+  - Mandar el mismo estado que ya tiene responde 200 con los afectados de ahora, pero no guarda, no audita ni
+    avisa: un doble toque no deja dos registros.
+  - 404 "El plato no existe": no está o es de otro local. Sin `disponible`, 400.
+  - Un pedido que el cliente manda justo mientras se apaga el plato puede entrar y no salir en `afectados`.
+    Llega a la cola de Caja con ese ítem en `disponible: false`, y se rechaza con `NO_DISPONIBLE`.
+- **Cancelar los afectados** (si Caja acepta en el diálogo): `POST /api/v1/caja/pedidos/cancelar` con
+  `{"pedidoIds": [12, 14]}`, los ids tal cual vienen en `afectados`. Si Caja no acepta, no se manda nada: el
+  plato queda apagado y los pedidos siguen como estaban. Cancela los pedidos enteros, con Caja como quien los
+  canceló, y le avisa a cada cliente. Uno por uno es `POST /api/v1/caja/pedidos/{id}/cancelar`. Los dos son de
+  German: ver [docs/sprint-2-german.md](docs/sprint-2-german.md).
+- **Celulares.** Cuando un plato cambia de verdad, cada celular con la cuenta abierta (o pedida) en ese local
+  recibe en `/user/queue/pedido` `PLATO_BAJA` o `PLATO_DISPONIBLE`, después del commit. Al recibir cualquiera
+  de los dos, el front vuelve a pedir `GET /public/mesas/{tokenQR}/menu`, como al reconectar. Con `PLATO_BAJA`,
+  el carrito saca ese `platoId` si lo tenía:
+
+```json
+{"tipo": "PLATO_BAJA", "pedidoId": null, "mesaId": null, "cuentaId": null, "platoId": 1, "estado": null,
+ "detalle": null, "ocurridoEn": "2026-11-02T23:03:05Z"}
+```
+
+  Todos los eventos del canal llevan ahora `platoId`, en `null` salvo en estos dos.
+- Auditoría: `CAMBIAR_DISPONIBILIDAD`, entidad `PLATO`, con `{disponible}` antes y después y quién lo hizo.
+- `DisponibilidadDePlatosTest` recorre HU-09 contra el MySQL del Compose (CP-23-01 a CP-23-08, la cancelación
+  de CP-23-02 con el lote de German, y CP-25-06), con el PIN de Carla y Hugo y el email del Admin. Lo que viaja
+  por el WebSocket lo prueban `CambiarDisponibilidadServiceTest` y `AvisoDeDisponibilidadAdapterTest`.
 
 ## Sprint 2: tareas de German
 
