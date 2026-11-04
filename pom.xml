@@ -8,7 +8,7 @@
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
     <!-- Spring Boot 4.0.x = Spring Framework 7.0.x. Subir al último 4.0.x si hace falta. -->
-    <version>4.0.0</version>
+    <version>4.0.8</version>
     <relativePath/>
   </parent>
 
@@ -55,7 +55,7 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-      <version>1.82</version>
+      <version>1.85.2</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
