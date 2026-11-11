@@ -9,7 +9,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.chitgo.pedidos.aplicacion.ColaDeCocinaService;
 import com.chitgo.pedidos.aplicacion.GestionDeColaService;
+import com.chitgo.pedidos.aplicacion.dto.PedidosAprobadosDto;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
 @RestController
@@ -19,9 +21,18 @@ public class GestionDeColaController {
     public record CancelarLoteRequest(@NotNull @Size(min = 1, max = 100) List<@NotNull @Positive Long> pedidoIds) {}
 
     private final GestionDeColaService servicio;
+    private final ColaDeCocinaService colaDeCocina;
 
-    public GestionDeColaController(GestionDeColaService servicio) {
+    public GestionDeColaController(GestionDeColaService servicio, ColaDeCocinaService colaDeCocina) {
         this.servicio = servicio;
+        this.colaDeCocina = colaDeCocina;
+    }
+
+    /** ST-17, P-36: los aprobados que Caja puede priorizar o cancelar, en el orden de la cola de cocina. */
+    @GetMapping("/aprobados")
+    @PreAuthorize("hasAuthority('pedido.priorizar')")
+    public PedidosAprobadosDto aprobados(@AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return colaDeCocina.obtenerAprobados(usuario);
     }
 
     @PutMapping("/{id}/prioridad")
