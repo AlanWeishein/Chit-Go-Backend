@@ -15,6 +15,7 @@ import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.pedidos.aplicacion.dto.ItemDeCocinaDto;
 import com.chitgo.pedidos.aplicacion.dto.PedidoDeCocinaDto;
+import com.chitgo.pedidos.aplicacion.dto.PedidosAprobadosDto;
 import com.chitgo.pedidos.aplicacion.dto.VistaDeCocinaDto;
 import com.chitgo.pedidos.dominio.ColaDeCocina;
 import com.chitgo.pedidos.dominio.EstadoPedido;
@@ -51,15 +52,24 @@ public class ColaDeCocinaService {
         List<Pedido> activos = pedidos.listarActivosDeCocina(localId);
         Map<Long, String> nombres = armador.nombresDePlatos(localId, activos);
 
-        ColaDeCocina cola = ColaDeCocina.con(deEstado(activos, EstadoPedido.APROBADO));
         return new VistaDeCocinaDto(
-                cola.enOrden().stream().map(p -> aDto(p, nombres)).toList(),
-                deEstado(activos, EstadoPedido.EN_PREPARACION).stream()
-                        .sorted(Comparator.comparing(Pedido::getEnPreparacionEn))
-                        .map(p -> aDto(p, nombres)).toList(),
+                sinEmpezar(activos, nombres),
+                enPreparacion(activos, nombres),
                 deEstado(activos, EstadoPedido.LISTO).stream()
                         .sorted(Comparator.comparing(Pedido::getListoEn))
                         .map(p -> aDto(p, nombres)).toList());
+    }
+
+    /**
+     * ST-17: lo que Caja ve de la cocina (P-36), sin los listos. Es la misma consulta y el mismo orden que el KDS,
+     * para que Caja y Cocina vean la cola igual.
+     */
+    @Transactional(readOnly = true)
+    public PedidosAprobadosDto obtenerAprobados(UsuarioAutenticado usuario) {
+        Long localId = localDe(usuario);
+        List<Pedido> activos = pedidos.listarActivosDeCocina(localId);
+        Map<Long, String> nombres = armador.nombresDePlatos(localId, activos);
+        return new PedidosAprobadosDto(sinEmpezar(activos, nombres), enPreparacion(activos, nombres));
     }
 
     /** Aprobado a En preparación. */
@@ -96,6 +106,7 @@ public class ColaDeCocinaService {
         EventoTiempoReal evento = EventoTiempoReal.de(tipo, pedido.getId(), mesaId, pedido.getEstado().name(), null, ahora);
 
         eventos.aCocina(localId, evento);
+        eventos.aCaja(localId, evento); // ST-17: la P-36 de Caja pasa el pedido de "sin empezar" a "en preparación"
         eventos.aPantalla(localId, evento);
         eventos.aCliente(pedido.getClienteSesion().getTokenSesion(), evento);
         if (tipo == TipoEvento.LISTO) {
@@ -110,6 +121,18 @@ public class ColaDeCocinaService {
             throw new AccesoDenegadoException("Esta acción es de un local");
         }
         return usuario.localId();
+    }
+
+    /** Los aprobados en el orden de la cola: prioritarios primero y después por llegada. */
+    private static List<PedidoDeCocinaDto> sinEmpezar(List<Pedido> activos, Map<Long, String> nombres) {
+        return ColaDeCocina.con(deEstado(activos, EstadoPedido.APROBADO)).enOrden().stream()
+                .map(p -> aDto(p, nombres)).toList();
+    }
+
+    private static List<PedidoDeCocinaDto> enPreparacion(List<Pedido> activos, Map<Long, String> nombres) {
+        return deEstado(activos, EstadoPedido.EN_PREPARACION).stream()
+                .sorted(Comparator.comparing(Pedido::getEnPreparacionEn))
+                .map(p -> aDto(p, nombres)).toList();
     }
 
     private static List<Pedido> deEstado(List<Pedido> todos, EstadoPedido estado) {

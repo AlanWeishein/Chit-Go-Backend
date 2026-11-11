@@ -242,6 +242,38 @@ HU-08, pantalla P-08. Cuando un pedido pasa los 3 minutos sin que Caja lo aprueb
 - Lo prueban `AlertaDeDemoraTest` (CP-20-01 a CP-20-04, contra el MySQL del Compose) y
   `AlertaDeDemoraProgramadaTest` (que la tarea quede agendada cada 5 segundos).
 
+## Pedidos aprobados (para el front)
+
+ST-17, pantalla P-36. Caja ve los pedidos aprobados que Cocina todavía no terminó. Pide el permiso
+`pedido.priorizar`, que tiene solo Caja: sin sesión da 401, y con Cocina, Mozo o Admin, 403. Un usuario sin local
+fijo (el Gerente/Dueño) también da 403.
+
+- `GET /api/v1/caja/pedidos/aprobados`. Responde 200 con dos listas, que pueden venir vacías:
+
+```json
+{
+  "sinEmpezar": [
+    {"id": 12, "mesa": "1", "estado": "APROBADO", "prioritario": true, "aprobadoEn": "2026-10-21T23:01:00Z",
+     "enPreparacionEn": null, "listoEn": null,
+     "items": [{"plato": "Milanesa napolitana", "cantidad": 2, "observacion": "sin cebolla"}]}
+  ],
+  "enPreparacion": []
+}
+```
+
+  - Cada pedido es el mismo `PedidoDeCocinaDto` de `GET /cocina/pedidos`. `mesa` es el número que se muestra.
+  - `sinEmpezar` son los `APROBADO`, en el orden de la cola de cocina: los prioritarios primero y después por
+    hora de aprobación (`aprobadoEn`). El front no los reordena.
+  - `enPreparacion` son los `EN_PREPARACION`, del que empezó antes al que empezó después.
+  - No van los pendientes, los listos, los servidos, los rechazados ni los cancelados.
+- Es solo lectura: no se audita ni publica nada. Priorizar es `PUT /caja/pedidos/{id}/prioridad` y cancelar,
+  `POST /caja/pedidos/{id}/cancelar`.
+- Tiempo real, en `/topic/local/{localId}/caja/pedidos`: además de `PRIORIDAD_CAMBIADA` y `PEDIDO_CANCELADO`,
+  llegan `EN_PREPARACION` cuando Cocina empieza un pedido y `LISTO` cuando lo termina, con el `pedidoId`, el
+  `mesaId` y el `estado` nuevo. Con cualquiera de los eventos, el front vuelve a pedir el `GET`.
+  La cola de aprobación (P-08) y las cuentas (P-09) escuchan el mismo topic y también van a recargar.
+- Lo prueban `PedidosAprobadosParaCajaTest` (contra el MySQL del Compose) y `ColaDeCocinaServiceTest` (el aviso).
+
 ## Cancelar un pedido
 
 Para quien arma un Service que cancela (la cancelación en bloque de HU-09, el cierre de cuenta de HU-10).
