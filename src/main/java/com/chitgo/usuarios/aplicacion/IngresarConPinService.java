@@ -49,8 +49,9 @@ public class IngresarConPinService {
      * la transacción.
      *
      * @throws NoEncontradoException     si el token de staff no es de ningún local, o el usuario no es de ese
-     *                                   local, está dado de baja o no entra con PIN
-     * @param habilitacion                 el valor de la cookie de dispositivo, o NULL si no vino
+     *                                   local, está dado de baja, tiene una ausencia que cubre hoy o no entra
+     *                                   con PIN
+     * @param habilitacion                el valor de la cookie de dispositivo, o NULL si no vino
      * @throws UsuarioBloqueadoException    si ya estaba bloqueado, o se bloqueó con este intento
      * @throws ContrasenaRequeridaException si es un mozo sin la cookie de dispositivo vigente para él
      * @throws PinIncorrectoException       si el PIN no coincide
@@ -66,6 +67,11 @@ public class IngresarConPinService {
                 .filter(Usuario::isActivo)
                 .filter(u -> u.getRol().entraConPin())
                 .orElseThrow(() -> new NoEncontradoException(USUARIO_INVALIDO));
+        // Con una ausencia vigente no entra mientras dure (decidido el 20/10, punto 11). Da lo mismo que un dado
+        // de baja, antes del bloqueo y del PIN, así que no suma intentos.
+        if (usuarios.tieneAusenciaVigente(usuario.getId(), local.getId(), DiaDelLocal.hoy(reloj))) {
+            throw new NoEncontradoException(USUARIO_INVALIDO);
+        }
 
         // Bloqueado, el PIN ni se mira: así el bloqueo no sirve para seguir probando PINes. Va antes que la
         // cookie de dispositivo: si no, un mozo bloqueado y sin cookie iría de P-32 al 401 y nunca vería que

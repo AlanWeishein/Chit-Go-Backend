@@ -49,18 +49,20 @@ public class HabilitarDispositivoService {
      * transacción.
      *
      * @throws NoEncontradoException                  si el token de staff no es de ningún local
-     * @throws UsuarioOContrasenaIncorrectosException si el usuario no es un mozo activo de ese local, si la
-     *                                                contraseña no coincide, o si está bloqueado
+     * @throws UsuarioOContrasenaIncorrectosException si el usuario no es un mozo activo de ese local, si tiene una
+     *                                                ausencia que cubre hoy, si la contraseña no coincide, o si
+     *                                                está bloqueado
      */
     @Transactional(noRollbackFor = UsuarioOContrasenaIncorrectosException.class)
     public ResultadoDeHabilitacion habilitar(String tokenStaff, String nombreUsuario, String password) {
         Local local = locales.buscarPorTokenStaff(tokenStaff)
                 .orElseThrow(() -> new NoEncontradoException(ConsultarStaffService.QR_INVALIDO));
-        // El nombre de usuario es único dentro del local del QR. Un dado de baja, o alguien de otro rol, da lo
-        // mismo que uno que no existe, y no suma intentos.
+        // El nombre de usuario es único dentro del local del QR. Un dado de baja, alguien de otro rol o un mozo con
+        // una ausencia vigente (decidido el 20/10, punto 11) da lo mismo que uno que no existe, y no suma intentos.
         Usuario usuario = usuarios.buscarPorNombreDeUsuarioParaIngreso(local.getId(), nombreUsuario.strip())
                 .filter(Usuario::isActivo)
                 .filter(u -> u.getRol().esMozo())
+                .filter(u -> !usuarios.tieneAusenciaVigente(u.getId(), local.getId(), DiaDelLocal.hoy(reloj)))
                 .orElse(null);
         if (usuario == null) {
             codificador.verificar(password, hashDeRelleno);

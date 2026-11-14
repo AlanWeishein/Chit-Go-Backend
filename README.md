@@ -505,6 +505,202 @@ Los cambios no se avisan en vivo: el cliente los ve la próxima vez que carga la
 - `CartaDelAdminTest` recorre HU-12 contra el MySQL del Compose (CP-25-01 a CP-25-08, menos CP-25-06, que es de
   la ST-12), con el login del Admin de verdad y la carta del cliente por el QR de la mesa 1.
 
+## Empleados (para el front)
+
+HU-14, pantallas P-16 y P-23. Todas las rutas piden sesión de Admin (el permiso `empleado.gestionar`): sin sesión
+dan 401 y con otro rol, 403 "No tenés permiso para hacer esto." (Juan, el Mozo, y el Gerente/Dueño también).
+Los `POST`, `PUT`, `PATCH` y `DELETE` llevan el header `X-XSRF-TOKEN` (ver "Sesión y CSRF"); sin él, 403. Los
+errores salen en ProblemDetail y el `detail` se puede mostrar tal cual. El local sale de la sesión. Un empleado,
+una mesa o una ausencia de otro local da el mismo 404 que uno que no existe, también cuando viene en el body.
+
+Solo se gestionan Mozo, Caja y Cocina. **El Admin no aparece en la lista** y su id da 404 "El empleado no
+existe": nadie se da de baja a sí mismo. Al Admin lo crea el Gerente/Dueño.
+
+### Listado y detalle
+
+- `GET /api/v1/admin/empleados?page=0&size=20`: los empleados del local, por nombre. **También los dados de
+  baja**, con `activo: false`. Responde la página:
+
+```json
+{"contenido": [
+   {"id": 4, "nombre": "Juan Pérez", "rol": "MOZO", "nombreUsuario": "juan", "activo": true,
+    "bloqueado": false, "ausenciaVigente": false,
+    "turnos": [{"dia": "LUN", "horaInicio": "12:00:00", "horaFin": "16:00:00"}]}
+ ],
+ "page": 0, "size": 20, "totalElementos": 4, "totalPaginas": 1}
+```
+
+  - **Esta forma es provisoria**: la propuso Claude Code porque en `develop` no había ningún listado paginado, y
+    falta acordarla con German, que pagina auditoría, reportes y mesas. Si cambia, cambia acá.
+  - `page` empieza en 0. `size` vale 20 si no viene y el máximo es 100. Fuera de rango, 400 "La página o el
+    tamaño no son válidos". Los empleados con el mismo nombre se ordenan por id, así las páginas no repiten ni
+    salteen a nadie.
+  - `rol` es el código (`MOZO`, `CAJA` o `COCINA`). `nombreUsuario` va en `null` si no es mozo. `bloqueado` es
+    que llegó a los 5 intentos fallidos (se destraba con el blanqueo de PIN). `ausenciaVigente` es que hoy cae
+    dentro de una ausencia.
+  - `dia` es `LUN`, `MAR`, `MIE`, `JUE`, `VIE`, `SAB` o `DOM`. Las horas se mandan como `"12:00"` y **vuelven con segundos**, `"12:00:00"` (medido por HTTP).
+    Un `page` que no es un número también da 400.
+- `GET /api/v1/admin/empleados/{id}`: el detalle. Es lo que responden también los `PUT` y el blanqueo:
+
+```json
+{"id": 4, "nombre": "Juan Pérez", "rol": "MOZO", "nombreUsuario": "juan", "activo": true, "bloqueado": false,
+ "ausenciaVigente": false, "debeCambiarCredencial": false, "contrasenaProvisoria": false,
+ "turnos": [{"dia": "LUN", "horaInicio": "12:00:00", "horaFin": "16:00:00"}],
+ "mesaIds": [1, 2, 3],
+ "ausencias": [{"id": 7, "tipo": "VACACIONES", "desde": "2026-12-01", "hasta": "2026-12-15"}]}
+```
+
+  - Las mesas vienen como `mesaIds`, sin el número. Las ausencias, de la más nueva a la más vieja. Nunca viene un
+    PIN, una contraseña ni su hash.
+
+### Alta, edición y baja
+
+- `POST /api/v1/admin/empleados`: el alta. Responde 201 con el detalle.
+
+```json
+{"nombre": "Pedro Gómez", "rol": "MOZO", "pin": "0000", "nombreUsuario": "pedro", "password": "Provisoria2026"}
+```
+
+  - `nombre`, `rol` y `pin` van siempre. `nombreUsuario` y `password` van **solo si es Mozo** y son obligatorios;
+    con Caja o Cocina, 400 "Solo el mozo lleva usuario y contraseña".
+  - El PIN y la contraseña los escribe el Admin y son provisorios: el empleado nace con
+    `debeCambiarCredencial: true` y tiene que elegir los suyos (ver "Primer ingreso"). Al mozo también le queda
+    `contrasenaProvisoria: true`.
+  - El `rol` se acepta en mayúsculas o minúsculas y los textos se recortan.
+  - El nuevo sale en la lista del login de su local.
+- `PUT /api/v1/admin/empleados/{id}`: la edición. Responde 200 con el detalle.
+
+```json
+{"nombre": "Pedro Gómez", "nombreUsuario": "pedro"}
+```
+
+  - **Se manda el empleado entero:** `nombre` y, si es Mozo, `nombreUsuario`. Caja y Cocina no mandan
+    `nombreUsuario` (400 "Solo el mozo lleva usuario").
+  - **El rol, el PIN y la contraseña no se cambian acá.** Para cambiar de rol, baja y alta. Para el PIN, el
+    blanqueo (ver abajo).
+  - Una edición sin cambios responde 200 y no hace nada.
+- `DELETE /api/v1/admin/empleados/{id}`: baja lógica. Responde 204. No borra nada: sus pedidos, turnos y
+  auditoría quedan. Sale de la lista del login y no puede entrar. Darlo de baja dos veces responde lo mismo.
+- **Un dado de baja es de solo lectura.** La edición, los turnos, las mesas, las ausencias nuevas y el blanqueo de
+  PIN responden 409 "El empleado está dado de baja". Se puede seguir pidiendo su detalle y sus ausencias.
+- **Su usuario queda ocupado:** si "juan" se va, no se puede dar de alta otro "juan" en ese local.
+- Errores del alta y la edición:
+  - 400 "Falta el nombre", "Falta el rol", "El rol tiene que ser Mozo, Caja o Cocina", "Falta el PIN", "Falta el
+    usuario del mozo" y "Falta la contraseña del mozo". **El campo viene en el texto del `detail`**, no en un
+    campo aparte.
+  - 400 "Los datos enviados no son válidos.": el PIN no tiene de 4 a 10 dígitos, la contraseña no tiene de 8 a
+    64 caracteres o pasa de 72 bytes, el nombre pasa de 120 caracteres o el usuario de 40.
+  - 409 "Ya existe un usuario con ese nombre": el usuario del mozo ya está en el local. No distingue mayúsculas
+    y tampoco tildes ("juan", "JUAN" y "juán" son el mismo, probado por HTTP), y cuenta a los dados de baja. En otro local se puede repetir.
+  - 404 "El empleado no existe". 409 "El empleado está dado de baja" (solo en la edición).
+
+### Turnos y mesas
+
+- `PUT /api/v1/admin/empleados/{id}/turnos`: **reemplaza la plantilla semanal entera.** Responde 200 con el
+  detalle. La lista vacía lo deja sin turnos.
+
+```json
+[{"dia": "LUN", "horaInicio": "12:00", "horaFin": "16:00"}, {"dia": "VIE", "horaInicio": "20:00", "horaFin": "02:00"}]
+```
+
+  - **Si `horaFin` es menor que `horaInicio`, el turno termina al día siguiente:** el de 20:00 a 02:00 se guarda
+    tal cual. El `dia` es el que empieza. `dia` se acepta en mayúsculas o minúsculas.
+  - 400 "El turno no puede empezar y terminar a la misma hora".
+  - 400 si dos turnos se pisan, y no se guarda ninguno: "Los turnos del lunes se pisan" (mismo día) o "El turno
+    del lunes se pisa con el del martes" (uno que cruza la medianoche contra el del día siguiente, y el del
+    domingo contra el del lunes). Dos que se tocan, de 12 a 16 y de 16 a 20, no se pisan.
+  - 400 "Falta el día del turno", "El día tiene que ser LUN, MAR, MIE, JUE, VIE, SAB o DOM", "Falta la hora de
+    inicio o de fin del turno", "Faltan los turnos" y "Falta un turno".
+- `PUT /api/v1/admin/empleados/{id}/mesas` con `{"mesaIds": [5, 6]}`: **reemplaza las mesas del mozo.** Responde
+  200 con el detalle. La lista vacía lo deja sin mesas.
+  - Una mesa puede tener varios mozos. Los ids repetidos se juntan en uno, y una mesa inhabilitada se puede
+    asignar.
+  - 404 "La mesa no existe": no existe o es de otro local, y **no se guarda ninguna**.
+  - 400 "Solo el mozo tiene mesas asignadas", "Faltan las mesas" y "Falta el id de una mesa".
+
+### Ausencias
+
+Vacaciones, franco o baja temporal. Mientras una ausencia esté vigente, el empleado no sale en la lista del login
+ni puede entrar (ver "Qué cambia en el login").
+
+- `GET /api/v1/admin/empleados/{id}/ausencias`: la lista, de la más nueva a la más vieja, sin paginar. Cada una
+  es `{id, tipo, desde, hasta}`. `hasta` va en `null` si no tiene fecha de vuelta.
+- `POST /api/v1/admin/empleados/{id}/ausencias`: responde 201 con la ausencia.
+
+```json
+{"tipo": "VACACIONES", "desde": "2026-12-01", "hasta": "2026-12-15"}
+```
+
+  - `tipo` es `VACACIONES`, `FRANCO` o `BAJA_TEMPORAL` (se acepta en minúsculas). `hasta` es opcional.
+  - **`desde` y `hasta` cuentan los dos:** el empleado vuelve el día siguiente a `hasta`, solo, sin que nadie
+    toque la ausencia. Una de un solo día tiene `hasta = desde`. Los días son del local (hora de Buenos Aires).
+  - 400 "Falta el tipo de ausencia", "El tipo tiene que ser VACACIONES, FRANCO o BAJA_TEMPORAL", "Falta la fecha
+    de inicio" y "La ausencia no puede terminar antes de empezar".
+- `PATCH /api/v1/admin/empleados/{id}/ausencias/{ausenciaId}` con `{"hasta": "2026-12-10"}`: termina la ausencia
+  o cambia la fecha de vuelta. Responde 200 con la ausencia.
+  - `hasta` es obligatorio (400 "Falta la fecha de fin") y no puede ser anterior a `desde`.
+  - 404 "La ausencia no existe": no existe, no es de ese empleado o es de otro local.
+- **No hay `DELETE` de ausencias:** terminarla es ponerle `hasta`, así queda de cuándo a cuándo faltó. Una cargada
+  por error no se puede anular; lo más que se puede es ponerle `hasta = desde`, y ese día cuenta igual.
+- No se controla que dos ausencias se pisen.
+
+### Blanqueo de PIN
+
+- `POST /api/v1/admin/empleados/{id}/pin` con `{"pin": "1234"}`: el PIN provisorio lo escribe el Admin, como en
+  el alta (de 4 a 10 dígitos). Responde 200 con el detalle.
+  - Guarda el PIN nuevo, vuelve los intentos a 0, **levanta el bloqueo** (es lo que destraba a un mozo que llegó
+    al 423) y pone `debeCambiarCredencial: true`: solo va a poder usar `/auth/credencial` hasta que elija el suyo.
+  - **`contrasenaProvisoria` no cambia.** El mozo que ya eligió su contraseña no tiene que volver a elegirla: le
+    alcanza con el PIN.
+  - Se puede blanquear a quien no está bloqueado. Dos blanqueos dejan dos registros de auditoría.
+  - Una sesión que el empleado ya tenía abierta queda limitada a `/auth/credencial` desde su próximo request.
+    **No invalida la cookie de dispositivo del mozo:** sigue sirviendo hasta que vence.
+  - 404 "El empleado no existe". 409 "El empleado está dado de baja". 400 "Falta el PIN", y el 400 genérico si no
+    tiene de 4 a 10 dígitos.
+
+### Qué cambia en el login
+
+- **`contrasenaProvisoria`** viaja en `GET /auth/sesion` y en las respuestas de `/auth/pin`, `/auth/admin/login` y
+  `/auth/credencial`, después de `debeCambiarCredencial`:
+
+```json
+{"id": 4, "nombre": "Juan Pérez", "rol": "MOZO", "local": {"id": 1, "nombre": "La Esquina"},
+ "debeCambiarCredencial": true, "contrasenaProvisoria": true, "expiraEn": "2026-11-14T15:00:00Z"}
+```
+
+  - Con `debeCambiarCredencial: true` y `contrasenaProvisoria: true` es un **primer ingreso**: el front muestra
+    P-32b (elegir contraseña) y P-30 (elegir PIN). Con `debeCambiarCredencial: true` y `contrasenaProvisoria:
+    false` es un **blanqueo de PIN**: solo P-30. Cuando `contrasenaProvisoria` es `true`, `debeCambiarCredencial`
+    también.
+  - Sale de la base en cada llamada, no del token. `local` va en `null` para el Gerente/Dueño.
+  - `/auth/mozo/login` y `/auth/dispositivo` no la llevan: no abren sesión. El front la recibe en el `/auth/pin`
+    que viene después.
+- **`POST /auth/credencial`:**
+  - Si el mozo tiene `contrasenaProvisoria: true`, la contraseña pasa a ser obligatoria: sin `password`, 400 "Elegí
+    tu contraseña.". Si falta todo, sale primero 400 "Elegí tu PIN.". Al guardarla, `contrasenaProvisoria` pasa a
+    `false`.
+  - Con `contrasenaProvisoria: false` (después de un blanqueo), alcanza con el PIN, como antes.
+  - Caja, Cocina y el Admin no cambian: siempre `contrasenaProvisoria: false`.
+- **La ausencia vigente:** `desde <= hoy` y `hasta` vacío o `>= hoy`, con hoy en Buenos Aires.
+  - `GET /public/staff/{tokenStaff}` no lista al empleado.
+  - `POST /auth/pin` le responde el mismo 404 que a un dado de baja ("El usuario no está en la lista de este
+    local."), sin sumar intentos. Se mira antes del bloqueo: un bloqueado con una ausencia vigente ve el 404 y no el
+    423.
+  - `POST /auth/mozo/login` le responde el 401 genérico "Usuario o contraseña incorrectos", sin sumar intentos y
+    sin mirar la contraseña.
+  - Al día siguiente de `hasta` vuelve a aparecer y a entrar solo.
+  - **Una sesión ya abierta cuando empieza la ausencia no se corta:** la renovación mira que esté activo, no la
+    ausencia. Al Admin y al Gerente/Dueño no se les mira la ausencia, porque nadie les puede cargar una.
+
+### Auditoría y cómo se prueba
+
+- Cada cambio deja un registro en la entidad `EMPLEADO`: `CREAR_EMPLEADO`, `EDITAR_EMPLEADO` (solo lo que
+  cambió), `BAJA_EMPLEADO`, `CAMBIAR_TURNOS`, `CAMBIAR_MESAS` y `BLANQUEAR_PIN`; y en la entidad `AUSENCIA`,
+  `CREAR_AUSENCIA` y `EDITAR_AUSENCIA`. Un cambio que no cambia nada no audita, salvo el blanqueo. Nunca va un PIN,
+  una contraseña ni su hash.
+- Los tests de HU-14 corren contra el MySQL del Compose, con el login del Admin de verdad (`admin@laesquina.test`)
+  y la seed: Juan (Mozo, mesas 1, 2 y 3), Ana (Moza, mesas 3 y 4), Carla (Caja) y Hugo (Cocina) en La Esquina.
+
 ## Disponibilidad (para el front)
 
 HU-09, pantallas P-10 (Caja) y P-14 (Admin). Apagar un plato y sacarlo de la carta son lo mismo: el plato deja de

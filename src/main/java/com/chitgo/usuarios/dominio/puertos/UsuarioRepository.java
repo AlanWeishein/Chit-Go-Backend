@@ -1,5 +1,6 @@
 package com.chitgo.usuarios.dominio.puertos;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,20 @@ public interface UsuarioRepository {
     /** El nombre de usuario del mozo es único dentro del local. También con la fila bloqueada. */
     Optional<Usuario> buscarPorNombreDeUsuarioParaIngreso(Long localId, String nombreUsuario);
 
-    /** Los activos del local con alguno de esos roles, ordenados por nombre. */
-    List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol);
+    Usuario guardar(Usuario usuario);
+
+    /**
+     * Si el nombre de usuario ya lo tiene otro usuario del local, sin distinguir mayúsculas y contando a los
+     * dados de baja. {@code excluirUsuarioId} deja afuera al propio usuario al editar (puede ser NULL).
+     */
+    boolean existeNombreDeUsuario(Long localId, String nombreUsuario, Long excluirUsuarioId);
+
+    /**
+     * La lista del login con PIN: los activos del local con alguno de esos roles y sin una ausencia que cubra
+     * {@code hoy} (hasta NULL = sin fecha de vuelta), ordenados por nombre.
+     */
+    List<Usuario> listarParaElLogin(Long localId, Collection<String> codigosDeRol, LocalDate hoy);
+
+    /** Si el usuario tiene, como empleado de ese local, una ausencia que cubre {@code hoy}. */
+    boolean tieneAusenciaVigente(Long usuarioId, Long localId, LocalDate hoy);
 }
