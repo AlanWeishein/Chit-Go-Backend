@@ -31,21 +31,30 @@ interface EmpleadoJpaRepository extends JpaRepository<Empleado, Long> {
     Optional<Long> usuarioDelEmpleado(@Param("empleadoId") Long empleadoId, @Param("localId") Long localId);
 
     /**
-     * Los empleados asignados a la mesa, activos, con un turno que cubre este día y esta hora y sin una
-     * ausencia vigente (hasta NULL = sin fecha de vuelta). Un turno que cruza la medianoche todavía no
-     * se contempla (pendiente HU-14).
+     * Los empleados asignados a la mesa, activos, con un turno que cubre este momento. Si la hora de fin es menor
+     * que la de inicio, el turno termina al día siguiente (P-23c), así que cuentan tres casos: el de hoy que no
+     * cruza (de su inicio a su fin), el de hoy que cruza (de su inicio a la medianoche) y el de ayer que cruza (de
+     * la medianoche a su fin). La ausencia (hasta NULL = sin fecha de vuelta) se mira en el día en que empezó el
+     * turno: si falta el lunes, su turno del lunes de 20:00 a 02:00 no cuenta tampoco el martes a la 01:00, y si
+     * falta solo el martes, a esa hora sí cuenta, porque está terminando el del lunes (ST-23, decidido el 14/11).
      */
     @Query("""
             SELECT e.id FROM Empleado e JOIN e.mesasAsignadas mm
             WHERE mm.id.mesaId = :mesaId AND e.usuario.activo = TRUE
-              AND EXISTS (SELECT t.id FROM Turno t WHERE t.empleado = e AND t.diaSemana = :dia
-                          AND t.horaInicio <= :hora AND t.horaFin > :hora)
-              AND NOT EXISTS (SELECT a.id FROM Ausencia a WHERE a.empleado = e AND a.desde <= :fecha
-                              AND (a.hasta IS NULL OR a.hasta >= :fecha))
+              AND EXISTS (SELECT t.id FROM Turno t WHERE t.empleado = e AND (
+                    (t.diaSemana = :dia AND t.horaInicio <= :hora
+                      AND (t.horaFin > :hora OR t.horaFin < t.horaInicio)
+                      AND NOT EXISTS (SELECT a.id FROM Ausencia a WHERE a.empleado = e AND a.desde <= :fecha
+                                      AND (a.hasta IS NULL OR a.hasta >= :fecha)))
+                    OR (t.diaSemana = :diaAnterior AND t.horaFin < t.horaInicio AND t.horaFin > :hora
+                      AND NOT EXISTS (SELECT a.id FROM Ausencia a WHERE a.empleado = e
+                                      AND a.desde <= :fechaAnterior
+                                      AND (a.hasta IS NULL OR a.hasta >= :fechaAnterior)))))
             ORDER BY e.id
             """)
     List<Long> mozosDeTurno(@Param("mesaId") Long mesaId, @Param("dia") DiaSemana dia,
-            @Param("hora") LocalTime hora, @Param("fecha") LocalDate fecha);
+            @Param("hora") LocalTime hora, @Param("fecha") LocalDate fecha,
+            @Param("diaAnterior") DiaSemana diaAnterior, @Param("fechaAnterior") LocalDate fechaAnterior);
 
     // HU-14: la gestión del Admin. Solo los roles que se dan de alta, así el Admin de la seed no aparece.
 
