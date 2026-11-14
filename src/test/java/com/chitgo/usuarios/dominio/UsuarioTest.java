@@ -222,4 +222,37 @@ class UsuarioTest {
 
         assertThat(pedro.isContrasenaProvisoria()).isTrue();
     }
+
+    // --- El "válido desde" del logout (CP-13-01)
+
+    @Test
+    void sinLogoutValeCualquierToken() {
+        assertThat(juan.getSesionValidaDesde()).isNull();
+        assertThat(juan.aceptaSesionEmitidaEn(AHORA.minus(Duration.ofDays(30)))).isTrue();
+    }
+
+    @Test
+    void elLogoutGuardaElSegundoSinLaFraccion() {
+        // Si se guardara 12:00:00.700, MySQL lo redondearía a 12:00:01 y el login de 12:00:00.900 no serviría.
+        juan.cerrarSesiones(AHORA.plusMillis(700));
+
+        assertThat(juan.getSesionValidaDesde()).isEqualTo(AHORA);
+    }
+
+    @Test
+    void despuesDelLogoutNoValeUnTokenDeUnSegundoAntes() {
+        juan.cerrarSesiones(AHORA.plusMillis(700));
+
+        assertThat(juan.aceptaSesionEmitidaEn(AHORA.minusSeconds(1))).isFalse();
+        assertThat(juan.aceptaSesionEmitidaEn(AHORA.plusSeconds(1))).isTrue();
+    }
+
+    @Test
+    void unTokenDelMismoSegundoDelLogoutVale() {
+        // El iat viene en segundos: el login de enseguida, en el mismo segundo, tiene que entrar. Es la ventana de
+        // un segundo que queda como límite (ST-23, tarea 3).
+        juan.cerrarSesiones(AHORA.plusMillis(700));
+
+        assertThat(juan.aceptaSesionEmitidaEn(AHORA)).isTrue();
+    }
 }

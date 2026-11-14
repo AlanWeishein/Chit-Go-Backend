@@ -199,7 +199,7 @@ class LoginConAusenciaYContrasenaProvisoriaTest {
         Usuario pedro = mozoNuevo();
         EmisorDeTokens emisor = mock(EmisorDeTokens.class);
         when(emisor.emitir(any(DatosDeSesion.class), any(Duration.class))).thenReturn("jwt");
-        when(emisor.leer("jwt")).thenReturn(new TokenLeido(null, AHORA.plusSeconds(600)));
+        when(emisor.leer("jwt")).thenReturn(new TokenLeido(null, AHORA.plusSeconds(600), AHORA));
 
         SesionDto sesion = new AperturaDeSesion(emisor).abrir(pedro, laEsquina).sesion();
 

@@ -11,6 +11,7 @@ import com.chitgo.usuarios.aplicacion.dto.DispositivoDto;
 import com.chitgo.usuarios.dominio.DispositivoHabilitado;
 import com.chitgo.usuarios.dominio.Local;
 import com.chitgo.usuarios.dominio.Usuario;
+import com.chitgo.usuarios.dominio.UsuarioBloqueadoException;
 import com.chitgo.usuarios.dominio.UsuarioOContrasenaIncorrectosException;
 import com.chitgo.usuarios.dominio.puertos.CodificadorDeClaves;
 import com.chitgo.usuarios.dominio.puertos.EmisorDeHabilitaciones;
@@ -50,8 +51,10 @@ public class HabilitarDispositivoService {
      *
      * @throws NoEncontradoException                  si el token de staff no es de ningún local
      * @throws UsuarioOContrasenaIncorrectosException si el usuario no es un mozo activo de ese local, si tiene una
-     *                                                ausencia que cubre hoy, si la contraseña no coincide, o si
-     *                                                está bloqueado
+     *                                                ausencia que cubre hoy, o si la contraseña no coincide, esté
+     *                                                bloqueado o no
+     * @throws UsuarioBloqueadoException              si está bloqueado y la contraseña es la correcta (CP-10-12):
+     *                                                no deja la cookie de dispositivo
      */
     @Transactional(noRollbackFor = UsuarioOContrasenaIncorrectosException.class)
     public ResultadoDeHabilitacion habilitar(String tokenStaff, String nombreUsuario, String password) {
@@ -69,9 +72,14 @@ public class HabilitarDispositivoService {
             throw new UsuarioOContrasenaIncorrectosException();
         }
 
-        // Bloqueado, la contraseña se verifica para que tarde lo mismo, pero el resultado no se usa.
+        // La contraseña se verifica siempre, también bloqueado, así los tres casos tardan lo mismo (CP-11-04).
         boolean coincide = codificador.verificar(password, usuario.getHashPassword());
         if (usuario.estaBloqueado(reloj.ahora())) {
+            // 423 solo a quien prueba que sabe la contraseña (B', decidido el 20/10, punto 4): el resto no se
+            // entera de que el usuario existe y está bloqueado. Ninguno de los dos suma intentos.
+            if (coincide) {
+                throw new UsuarioBloqueadoException();
+            }
             throw new UsuarioOContrasenaIncorrectosException();
         }
         if (!coincide) {

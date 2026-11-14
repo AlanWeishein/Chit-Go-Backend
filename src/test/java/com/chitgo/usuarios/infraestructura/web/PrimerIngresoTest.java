@@ -76,9 +76,10 @@ class PrimerIngresoTest {
             jdbc.update("UPDATE usuario SET pin_hash = ?, hash_password = ? WHERE id = ?",
                     fila.get("pin_hash"), fila.get("hash_password"), fila.get("id"));
         }
+        // El logout de un test deja el "válido desde" (ST-23, tarea 3).
         jdbc.update("""
                 UPDATE usuario SET debe_cambiar_credencial = FALSE, intentos_fallidos = 0, bloqueado_hasta = NULL,
-                activo = TRUE""");
+                activo = TRUE, sesion_valida_desde = NULL""");
     }
 
     // --- Lo que puede hacer con la credencial provisoria

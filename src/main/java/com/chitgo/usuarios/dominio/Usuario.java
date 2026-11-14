@@ -1,6 +1,7 @@
 package com.chitgo.usuarios.dominio;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -58,6 +59,9 @@ public class Usuario {
     private boolean activo = true;
 
     private boolean contrasenaProvisoria = false;
+
+    /** Lo pone el logout: los tokens emitidos antes ya no sirven (decidido el 20/10, punto 7). NULL vale todo. */
+    private Instant sesionValidaDesde;
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -131,6 +135,28 @@ public class Usuario {
 
     public Instant getCreadoEn() {
         return creadoEn;
+    }
+
+    public Instant getSesionValidaDesde() {
+        return sesionValidaDesde;
+    }
+
+    /**
+     * El logout (CP-13-01): desde este segundo, los tokens emitidos antes dan 401, en todos los dispositivos del
+     * usuario. Se guarda truncado al segundo, como el iat del token: si no, MySQL redondea la fracción hacia
+     * arriba y el login que viene enseguida, en el mismo segundo, tampoco serviría.
+     */
+    public void cerrarSesiones(Instant ahora) {
+        sesionValidaDesde = ahora.truncatedTo(ChronoUnit.SECONDS);
+    }
+
+    /**
+     * Si un token emitido en {@code emitidoEn} (el iat, en segundos) sigue valiendo. Un token del mismo segundo
+     * del logout pasa, para que el que vuelve a entrar enseguida no quede afuera; es una ventana de un segundo
+     * también para uno de antes del logout.
+     */
+    public boolean aceptaSesionEmitidaEn(Instant emitidoEn) {
+        return sesionValidaDesde == null || !emitidoEn.isBefore(sesionValidaDesde);
     }
 
     public boolean estaBloqueado(Instant ahora) {
