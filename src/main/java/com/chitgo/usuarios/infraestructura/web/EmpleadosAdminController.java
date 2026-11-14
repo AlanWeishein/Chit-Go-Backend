@@ -28,7 +28,7 @@ import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
 /**
  * HU-14, pantallas P-16 y P-23. Sesión de Admin: sin sesión responde 401 y sin el permiso, 403. Sin lógica de
- * negocio. El blanqueo del PIN cuelga de acá y llega en la tarea 3 de la ST-22.
+ * negocio.
  */
 @RestController
 @RequestMapping("/api/v1/admin/empleados")
@@ -76,6 +76,14 @@ public class EmpleadosAdminController {
     @PreAuthorize("hasAuthority('empleado.gestionar')")
     public void darDeBaja(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable("id") Long id) {
         empleados.darDeBaja(usuario, id);
+    }
+
+    /** Blanquea el PIN: el nuevo es provisorio y levanta el bloqueo (CP-10-06). Responde el detalle. */
+    @PostMapping("/{id}/pin")
+    @PreAuthorize("hasAuthority('empleado.gestionar')")
+    public EmpleadoDetalleDto blanquearPin(@AuthenticationPrincipal UsuarioAutenticado usuario,
+            @PathVariable("id") Long id, @Valid @RequestBody BlanqueoDePinRequest cuerpo) {
+        return empleados.blanquearPin(usuario, id, cuerpo.pin());
     }
 
     /** Reemplaza la plantilla semanal entera. La lista vacía lo deja sin turnos. */

@@ -148,7 +148,7 @@ public class Usuario {
     /**
      * Eligió su credencial en el primer ingreso o después de un blanqueo (CU-12): se guarda y la marca de
      * cambio obligatorio se apaga. Un hash NULL deja el que tenía, como la contraseña del mozo que solo eligió
-     * el PIN.
+     * el PIN. Con una contraseña nueva, la provisoria también queda atrás.
      */
     public void elegirCredencial(String nuevoPinHash, String nuevoHashPassword) {
         if (nuevoPinHash != null) {
@@ -156,8 +156,21 @@ public class Usuario {
         }
         if (nuevoHashPassword != null) {
             hashPassword = nuevoHashPassword;
+            contrasenaProvisoria = false;
         }
         debeCambiarCredencial = false;
+    }
+
+    /**
+     * El Admin le blanquea el PIN (HU-14, CP-10-06): el nuevo es provisorio, los intentos vuelven a 0 y se levanta
+     * el bloqueo. La contraseña provisoria queda como estaba: un blanqueo de PIN no le vuelve a pedir la
+     * contraseña al mozo.
+     */
+    public void blanquearPin(String nuevoPinHash) {
+        pinHash = nuevoPinHash;
+        intentosFallidos = 0;
+        bloqueadoHasta = null;
+        debeCambiarCredencial = true;
     }
 
     /**

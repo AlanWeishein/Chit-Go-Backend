@@ -171,4 +171,55 @@ class UsuarioTest {
         assertThat(juan.getHashPassword()).isEqualTo("hash");
         assertThat(juan.getBloqueadoHasta()).isEqualTo(Usuario.BLOQUEO_SIN_VENCIMIENTO);
     }
+
+    // --- HU-14: blanqueo del PIN y contraseña provisoria
+
+    @Test
+    void elBlanqueoDestrabaAlBloqueadoYDejaElPinProvisorio() {
+        // CP-10-06
+        fallar(5);
+        juan.elegirCredencial("pinElegido", null);
+
+        juan.blanquearPin("pinProvisorio");
+
+        assertThat(juan.getPinHash()).isEqualTo("pinProvisorio");
+        assertThat(juan.getIntentosFallidos()).isZero();
+        assertThat(juan.getBloqueadoHasta()).isNull();
+        assertThat(juan.estaBloqueado(AHORA)).isFalse();
+        assertThat(juan.isDebeCambiarCredencial()).isTrue();
+    }
+
+    @Test
+    void elBlanqueoNoTocaLaContrasenaNiLaContrasenaProvisoria() {
+        Usuario pedro = Usuario.nuevoEmpleado(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", "hashPass", "hashPin");
+        juan.blanquearPin("pinProvisorio");
+        pedro.blanquearPin("pinProvisorio");
+
+        // Juan ya había elegido su contraseña: el blanqueo no se la vuelve a pedir.
+        assertThat(juan.isContrasenaProvisoria()).isFalse();
+        assertThat(juan.getHashPassword()).isEqualTo("hash");
+        // Pedro todavía no la había elegido: sigue provisoria.
+        assertThat(pedro.isContrasenaProvisoria()).isTrue();
+        assertThat(pedro.getHashPassword()).isEqualTo("hashPass");
+    }
+
+    @Test
+    void elegirLaContrasenaApagaLaContrasenaProvisoria() {
+        Usuario pedro = Usuario.nuevoEmpleado(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", "hashPass", "hashPin");
+
+        pedro.elegirCredencial("pinNuevo", "passNueva");
+
+        assertThat(pedro.isContrasenaProvisoria()).isFalse();
+        assertThat(pedro.isDebeCambiarCredencial()).isFalse();
+        assertThat(pedro.getHashPassword()).isEqualTo("passNueva");
+    }
+
+    @Test
+    void elegirSoloElPinDejaLaContrasenaProvisoriaComoEstaba() {
+        Usuario pedro = Usuario.nuevoEmpleado(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", "hashPass", "hashPin");
+
+        pedro.elegirCredencial("pinNuevo", null);
+
+        assertThat(pedro.isContrasenaProvisoria()).isTrue();
+    }
 }

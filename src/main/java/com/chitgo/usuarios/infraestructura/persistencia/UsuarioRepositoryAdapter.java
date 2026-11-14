@@ -1,5 +1,6 @@
 package com.chitgo.usuarios.infraestructura.persistencia;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -62,7 +63,12 @@ class UsuarioRepositoryAdapter implements UsuarioRepository {
     }
 
     @Override
-    public List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol) {
-        return jpa.findByLocalIdAndActivoTrueAndRolCodigoInOrderByNombreAsc(localId, codigosDeRol);
+    public List<Usuario> listarParaElLogin(Long localId, Collection<String> codigosDeRol, LocalDate hoy) {
+        return jpa.listarParaElLogin(localId, codigosDeRol, hoy);
+    }
+
+    @Override
+    public boolean tieneAusenciaVigente(Long usuarioId, Long localId, LocalDate hoy) {
+        return jpa.tieneAusenciaVigente(usuarioId, localId, hoy);
     }
 }

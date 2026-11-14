@@ -1,5 +1,6 @@
 package com.chitgo.usuarios.dominio.puertos;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +32,12 @@ public interface UsuarioRepository {
      */
     boolean existeNombreDeUsuario(Long localId, String nombreUsuario, Long excluirUsuarioId);
 
-    /** Los activos del local con alguno de esos roles, ordenados por nombre. */
-    List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol);
+    /**
+     * La lista del login con PIN: los activos del local con alguno de esos roles y sin una ausencia que cubra
+     * {@code hoy} (hasta NULL = sin fecha de vuelta), ordenados por nombre.
+     */
+    List<Usuario> listarParaElLogin(Long localId, Collection<String> codigosDeRol, LocalDate hoy);
+
+    /** Si el usuario tiene, como empleado de ese local, una ausencia que cubre {@code hoy}. */
+    boolean tieneAusenciaVigente(Long usuarioId, Long localId, LocalDate hoy);
 }

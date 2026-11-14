@@ -43,7 +43,7 @@ class AperturaDeSesion {
         Instant expiraEn = emisor.leer(token).expiraEn();
         LocalDeSesionDto localDto = local != null ? new LocalDeSesionDto(local.getId(), local.getNombre()) : null;
         SesionDto sesion = new SesionDto(usuario.getId(), usuario.getNombre(), datos.rol(), localDto,
-                datos.debeCambiarCredencial(), expiraEn);
+                datos.debeCambiarCredencial(), usuario.isContrasenaProvisoria(), expiraEn);
         return new ResultadoDeIngreso(token, duracion, sesion);
     }
 

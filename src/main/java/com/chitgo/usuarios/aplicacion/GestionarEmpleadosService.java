@@ -1,7 +1,6 @@
 package com.chitgo.usuarios.aplicacion;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,7 +46,7 @@ import com.chitgo.usuarios.dominio.puertos.UsuarioRepository;
 
 /**
  * HU-14: el Admin da de alta, edita, lista y da de baja a Mozo, Caja y Cocina, y les carga los turnos, las mesas
- * (solo al mozo) y las ausencias (RF-26). El blanqueo del PIN llega en la tarea 3 de la ST-22.
+ * (solo al mozo) y las ausencias (RF-26), y les blanquean el PIN (RNF-07).
  *
  * <p>Un empleado, una mesa o una ausencia de otro local da 404, el mismo que si no existiera (RNF-10). El Admin del
  * local tampoco es un empleado que se gestione: su id da 404. Un dado de baja queda de solo lectura (409).
@@ -63,9 +62,6 @@ public class GestionarEmpleadosService {
     static final String USUARIO_REPETIDO = "Ya existe un usuario con ese nombre";
     static final String MESA_NO_EXISTE = "La mesa no existe";
     static final String AUSENCIA_NO_EXISTE = "La ausencia no existe";
-
-    /** Las ausencias son días del local, como en MozoDeTurnoAdapter. */
-    private static final ZoneId ZONA = ZoneId.of("America/Argentina/Buenos_Aires");
 
     private final EmpleadoRepository empleados;
     private final UsuarioRepository usuarios;
@@ -212,6 +208,32 @@ public class GestionarEmpleadosService {
         usuarios.guardar(empleado.getUsuario());
         auditor.registrar(localId, usuario.usuarioId(), "BAJA_EMPLEADO", ENTIDAD, empleado.getId(),
                 Map.of("activo", true), Map.of("activo", false));
+    }
+
+    /**
+     * Blanquea el PIN (CP-10-06): el que escribe el Admin queda como provisorio, los intentos vuelven a 0 y se
+     * levanta el bloqueo. La contraseña provisoria del mozo no cambia. Una sesión que ya estaba abierta queda
+     * limitada a elegir la credencial desde el próximo request, porque la renovación lee la marca de la base.
+     * Audita siempre, sin el PIN.
+     *
+     * @throws SolicitudInvalidaException si falta el PIN
+     * @throws ReglaDeNegocioException    si está dado de baja (409)
+     */
+    @Transactional
+    public EmpleadoDetalleDto blanquearPin(UsuarioAutenticado usuario, Long empleadoId, String pin) {
+        Long localId = localDe(usuario);
+        Empleado empleado = modificable(empleadoId, localId);
+        if (pin == null || pin.isBlank()) {
+            throw new SolicitudInvalidaException("Falta el PIN");
+        }
+
+        Usuario blanqueado = empleado.getUsuario();
+        Map<String, Object> antes = estadoDeLaCredencial(blanqueado);
+        blanqueado.blanquearPin(codificador.hashear(pin));
+        usuarios.guardar(blanqueado);
+        auditor.registrar(localId, usuario.usuarioId(), "BLANQUEAR_PIN", ENTIDAD, empleado.getId(), antes,
+                estadoDeLaCredencial(blanqueado));
+        return aDetalle(empleado, localId);
     }
 
     /**
@@ -422,6 +444,15 @@ public class GestionarEmpleadosService {
         return valores;
     }
 
+    /** Lo que cambia un blanqueo, para la auditoría. Tampoco lleva el PIN ni su hash. */
+    private Map<String, Object> estadoDeLaCredencial(Usuario u) {
+        Map<String, Object> valores = new LinkedHashMap<>();
+        valores.put("intentosFallidos", (int) u.getIntentosFallidos());
+        valores.put("bloqueado", u.estaBloqueado(reloj.ahora()));
+        valores.put("debeCambiarCredencial", u.isDebeCambiarCredencial());
+        return valores;
+    }
+
     private EmpleadoDetalleDto aDetalle(Empleado empleado, Long localId) {
         Usuario u = empleado.getUsuario();
         List<TurnoDto> turnos = aTurnosDto(empleados.turnosDe(List.of(empleado.getId()), localId));
@@ -451,8 +482,9 @@ public class GestionarEmpleadosService {
         return new AusenciaDto(a.getId(), a.getTipo(), a.getDesde(), a.getHasta());
     }
 
+    /** Las ausencias son días del local, como en MozoDeTurnoAdapter. */
     private LocalDate hoy() {
-        return reloj.ahora().atZone(ZONA).toLocalDate();
+        return DiaDelLocal.hoy(reloj);
     }
 
     /** El Gerente/Dueño no tiene local fijo y no gestiona empleados. */
