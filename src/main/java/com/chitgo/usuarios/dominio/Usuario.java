@@ -57,6 +57,8 @@ public class Usuario {
 
     private boolean activo = true;
 
+    private boolean contrasenaProvisoria = false;
+
     @CreationTimestamp
     @Column(updatable = false)
     private Instant creadoEn;
@@ -122,6 +124,11 @@ public class Usuario {
         return activo;
     }
 
+    /** El mozo todavía no eligió la contraseña que le puso el Admin (HU-14, decidido el 20/10). */
+    public boolean isContrasenaProvisoria() {
+        return contrasenaProvisoria;
+    }
+
     public Instant getCreadoEn() {
         return creadoEn;
     }
@@ -151,6 +158,33 @@ public class Usuario {
             hashPassword = nuevoHashPassword;
         }
         debeCambiarCredencial = false;
+    }
+
+    /**
+     * Alta de un empleado (HU-14): las credenciales las puso el Admin, así que son provisorias. Solo el mozo
+     * tiene contraseña provisoria.
+     */
+    public static Usuario nuevoEmpleado(Long localId, Rol rol, String nombre, String nombreUsuario,
+            String hashPassword, String pinHash) {
+        Usuario usuario = new Usuario(localId, rol, nombre, nombreUsuario, null, hashPassword, pinHash);
+        usuario.debeCambiarCredencial = true;
+        usuario.contrasenaProvisoria = rol.esMozo();
+        return usuario;
+    }
+
+    /** Cambia el nombre y, si es mozo, su usuario. El rol y las credenciales no se tocan. */
+    public void renombrar(String nuevoNombre, String nuevoNombreUsuario) {
+        nombre = nuevoNombre;
+        nombreUsuario = nuevoNombreUsuario;
+    }
+
+    /** Baja lógica. Devuelve false si ya estaba dado de baja, para que darlo de baja dos veces no cambie nada. */
+    public boolean darDeBaja() {
+        if (!activo) {
+            return false;
+        }
+        activo = false;
+        return true;
     }
 
     /** Entró con la credencial correcta: los intentos vuelven a 0. */

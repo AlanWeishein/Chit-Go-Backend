@@ -27,5 +27,10 @@ interface UsuarioJpaRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> buscarPorNombreDeUsuarioConBloqueo(@Param("localId") Long localId,
             @Param("nombreUsuario") String nombreUsuario);
 
+    @Query("SELECT COUNT(u) > 0 FROM Usuario u WHERE u.localId = :localId "
+            + "AND LOWER(u.nombreUsuario) = LOWER(:nombreUsuario) AND u.id <> :excluirId")
+    boolean existeNombreDeUsuario(@Param("localId") Long localId, @Param("nombreUsuario") String nombreUsuario,
+            @Param("excluirId") Long excluirId);
+
     List<Usuario> findByLocalIdAndActivoTrueAndRolCodigoInOrderByNombreAsc(Long localId, Collection<String> codigos);
 }

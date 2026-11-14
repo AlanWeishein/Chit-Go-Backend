@@ -100,4 +100,75 @@ class UsuarioTest {
             juan.registrarIntentoFallido();
         }
     }
+
+    // --- HU-14: alta, edición y baja de empleados
+
+    @Test
+    void unUsuarioComunNaceSinContrasenaProvisoria() {
+        assertThat(juan.isContrasenaProvisoria()).isFalse();
+        assertThat(juan.isActivo()).isTrue();
+    }
+
+    @Test
+    void elAltaDeUnMozoLoDejaConCambioObligatorioYContrasenaProvisoria() {
+        // CP-27-01
+        Usuario pedro = Usuario.nuevoEmpleado(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", "hashPass", "hashPin");
+
+        assertThat(pedro.isDebeCambiarCredencial()).isTrue();
+        assertThat(pedro.isContrasenaProvisoria()).isTrue();
+        assertThat(pedro.isActivo()).isTrue();
+        assertThat(pedro.getLocalId()).isEqualTo(1L);
+        assertThat(pedro.getNombreUsuario()).isEqualTo("pedro");
+        assertThat(pedro.getHashPassword()).isEqualTo("hashPass");
+        assertThat(pedro.getPinHash()).isEqualTo("hashPin");
+        assertThat(pedro.getEmail()).isNull();
+    }
+
+    @Test
+    void elAltaDeCajaYCocinaTieneCambioObligatorioPeroNoContrasenaProvisoria() {
+        for (String codigo : new String[] {"CAJA", "COCINA"}) {
+            Usuario nuevo = Usuario.nuevoEmpleado(1L, new Rol(codigo, codigo), "Nuevo", null, null, "hashPin");
+
+            assertThat(nuevo.isDebeCambiarCredencial()).as(codigo).isTrue();
+            assertThat(nuevo.isContrasenaProvisoria()).as(codigo).isFalse();
+            assertThat(nuevo.getNombreUsuario()).as(codigo).isNull();
+            assertThat(nuevo.getHashPassword()).as(codigo).isNull();
+        }
+    }
+
+    @Test
+    void renombrarCambiaElNombreYElUsuarioYNadaMas() {
+        fallar(3);
+
+        juan.renombrar("Juan Pablo", "juanpa");
+
+        assertThat(juan.getNombre()).isEqualTo("Juan Pablo");
+        assertThat(juan.getNombreUsuario()).isEqualTo("juanpa");
+        assertThat(juan.getRol().getCodigo()).isEqualTo("MOZO");
+        assertThat(juan.getHashPassword()).isEqualTo("hash");
+        assertThat(juan.getPinHash()).isEqualTo("hash");
+        assertThat(juan.getIntentosFallidos()).isEqualTo((short) 3);
+        assertThat(juan.isActivo()).isTrue();
+    }
+
+    @Test
+    void darDeBajaLoDesactivaYLaSegundaVezNoCambiaNada() {
+        // CP-27-04
+        assertThat(juan.darDeBaja()).isTrue();
+        assertThat(juan.isActivo()).isFalse();
+
+        assertThat(juan.darDeBaja()).isFalse();
+        assertThat(juan.isActivo()).isFalse();
+    }
+
+    @Test
+    void darDeBajaNoTocaLasCredencialesNiElBloqueo() {
+        fallar(5);
+
+        juan.darDeBaja();
+
+        assertThat(juan.getPinHash()).isEqualTo("hash");
+        assertThat(juan.getHashPassword()).isEqualTo("hash");
+        assertThat(juan.getBloqueadoHasta()).isEqualTo(Usuario.BLOQUEO_SIN_VENCIMIENTO);
+    }
 }

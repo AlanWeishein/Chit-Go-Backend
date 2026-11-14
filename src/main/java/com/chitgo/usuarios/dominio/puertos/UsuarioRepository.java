@@ -23,6 +23,14 @@ public interface UsuarioRepository {
     /** El nombre de usuario del mozo es único dentro del local. También con la fila bloqueada. */
     Optional<Usuario> buscarPorNombreDeUsuarioParaIngreso(Long localId, String nombreUsuario);
 
+    Usuario guardar(Usuario usuario);
+
+    /**
+     * Si el nombre de usuario ya lo tiene otro usuario del local, sin distinguir mayúsculas y contando a los
+     * dados de baja. {@code excluirUsuarioId} deja afuera al propio usuario al editar (puede ser NULL).
+     */
+    boolean existeNombreDeUsuario(Long localId, String nombreUsuario, Long excluirUsuarioId);
+
     /** Los activos del local con alguno de esos roles, ordenados por nombre. */
     List<Usuario> listarActivosDelLocal(Long localId, Collection<String> codigosDeRol);
 }
