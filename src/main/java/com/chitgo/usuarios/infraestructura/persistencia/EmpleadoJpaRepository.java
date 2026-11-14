@@ -56,6 +56,17 @@ interface EmpleadoJpaRepository extends JpaRepository<Empleado, Long> {
             @Param("hora") LocalTime hora, @Param("fecha") LocalDate fecha,
             @Param("diaAnterior") DiaSemana diaAnterior, @Param("fechaAnterior") LocalDate fechaAnterior);
 
+    /**
+     * Los locales con un turno de un empleado activo que empieza entre {@code desde} y {@code hasta}, los dos
+     * incluidos (ST-23, tarea 2). No mira el rol ni las ausencias: la alerta recalcula después el mozo de cada mesa.
+     */
+    @Query("""
+            SELECT DISTINCT t.localId FROM Turno t
+            WHERE t.diaSemana = :dia AND t.horaInicio BETWEEN :desde AND :hasta AND t.empleado.usuario.activo = TRUE
+            """)
+    Set<Long> localesConTurnoQueEmpieza(@Param("dia") DiaSemana dia, @Param("desde") LocalTime desde,
+            @Param("hasta") LocalTime hasta);
+
     // HU-14: la gestión del Admin. Solo los roles que se dan de alta, así el Admin de la seed no aparece.
 
     @Query(value = """
