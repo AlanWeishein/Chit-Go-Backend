@@ -20,9 +20,13 @@ import com.chitgo.usuarios.dominio.puertos.EmpleadoRepository;
 class EmpleadoRepositoryAdapter implements EmpleadoRepository {
 
     private final EmpleadoJpaRepository jpa;
+    private final TurnoJpaRepository turnos;
+    private final AusenciaJpaRepository ausencias;
 
-    EmpleadoRepositoryAdapter(EmpleadoJpaRepository jpa) {
+    EmpleadoRepositoryAdapter(EmpleadoJpaRepository jpa, TurnoJpaRepository turnos, AusenciaJpaRepository ausencias) {
         this.jpa = jpa;
+        this.turnos = turnos;
+        this.ausencias = ausencias;
     }
 
     @Override
@@ -65,5 +69,21 @@ class EmpleadoRepositoryAdapter implements EmpleadoRepository {
     @Override
     public List<Ausencia> ausenciasDe(Long empleadoId, Long localId) {
         return jpa.ausenciasDe(empleadoId, localId);
+    }
+
+    @Override
+    public void reemplazarTurnos(Long empleadoId, Long localId, List<Turno> nuevos) {
+        turnos.borrarDe(empleadoId, localId);
+        turnos.saveAll(nuevos);
+    }
+
+    @Override
+    public Ausencia guardarAusencia(Ausencia ausencia) {
+        return ausencias.save(ausencia);
+    }
+
+    @Override
+    public Optional<Ausencia> buscarAusencia(Long ausenciaId, Long empleadoId, Long localId) {
+        return ausencias.buscar(ausenciaId, empleadoId, localId);
     }
 }

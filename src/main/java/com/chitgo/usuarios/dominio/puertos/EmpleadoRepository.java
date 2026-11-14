@@ -35,4 +35,12 @@ public interface EmpleadoRepository {
 
     /** Las ausencias del empleado, de la más nueva a la más vieja. */
     List<Ausencia> ausenciasDe(Long empleadoId, Long localId);
+
+    /** Borra los turnos del empleado y guarda estos en su lugar. */
+    void reemplazarTurnos(Long empleadoId, Long localId, List<Turno> turnos);
+
+    Ausencia guardarAusencia(Ausencia ausencia);
+
+    /** La ausencia, si es de ese empleado y de ese local. */
+    Optional<Ausencia> buscarAusencia(Long ausenciaId, Long empleadoId, Long localId);
 }

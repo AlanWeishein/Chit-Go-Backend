@@ -2,13 +2,14 @@ package com.chitgo.usuarios.aplicacion;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -22,37 +23,46 @@ import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.compartido.dominio.SolicitudInvalidaException;
 import com.chitgo.usuarios.aplicacion.dto.AusenciaDto;
 import com.chitgo.usuarios.aplicacion.dto.DatosDeAltaDeEmpleado;
+import com.chitgo.usuarios.aplicacion.dto.DatosDeAusencia;
 import com.chitgo.usuarios.aplicacion.dto.DatosDeEdicionDeEmpleado;
+import com.chitgo.usuarios.aplicacion.dto.DatosDeTurno;
 import com.chitgo.usuarios.aplicacion.dto.EmpleadoDetalleDto;
 import com.chitgo.usuarios.aplicacion.dto.EmpleadoResumenDto;
 import com.chitgo.usuarios.aplicacion.dto.PaginaDto;
 import com.chitgo.usuarios.aplicacion.dto.TurnoDto;
+import com.chitgo.usuarios.dominio.Ausencia;
+import com.chitgo.usuarios.dominio.DiaSemana;
 import com.chitgo.usuarios.dominio.Empleado;
 import com.chitgo.usuarios.dominio.PaginaDe;
 import com.chitgo.usuarios.dominio.Rol;
+import com.chitgo.usuarios.dominio.TipoAusencia;
 import com.chitgo.usuarios.dominio.Turno;
 import com.chitgo.usuarios.dominio.Usuario;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 import com.chitgo.usuarios.dominio.puertos.CodificadorDeClaves;
 import com.chitgo.usuarios.dominio.puertos.EmpleadoRepository;
+import com.chitgo.usuarios.dominio.puertos.MesasDelLocal;
 import com.chitgo.usuarios.dominio.puertos.RolRepository;
 import com.chitgo.usuarios.dominio.puertos.UsuarioRepository;
 
 /**
- * HU-14: el Admin da de alta, edita, lista y da de baja a Mozo, Caja y Cocina (RF-26). Los turnos, las mesas, las
- * ausencias y el blanqueo del PIN llegan en las tareas siguientes de la ST-22.
+ * HU-14: el Admin da de alta, edita, lista y da de baja a Mozo, Caja y Cocina, y les carga los turnos, las mesas
+ * (solo al mozo) y las ausencias (RF-26). El blanqueo del PIN llega en la tarea 3 de la ST-22.
  *
- * <p>Un empleado de otro local da 404, el mismo que si no existiera (RNF-10). El Admin del local tampoco es un
- * empleado que se gestione: su id da 404. Un dado de baja queda de solo lectura.
+ * <p>Un empleado, una mesa o una ausencia de otro local da 404, el mismo que si no existiera (RNF-10). El Admin del
+ * local tampoco es un empleado que se gestione: su id da 404. Un dado de baja queda de solo lectura (409).
  */
 @Service
 public class GestionarEmpleadosService {
 
     static final String ENTIDAD = "EMPLEADO";
+    static final String ENTIDAD_AUSENCIA = "AUSENCIA";
     static final int TAMANIO_MAXIMO = 100;
     static final String NO_EXISTE = "El empleado no existe";
     static final String DADO_DE_BAJA = "El empleado está dado de baja";
     static final String USUARIO_REPETIDO = "Ya existe un usuario con ese nombre";
+    static final String MESA_NO_EXISTE = "La mesa no existe";
+    static final String AUSENCIA_NO_EXISTE = "La ausencia no existe";
 
     /** Las ausencias son días del local, como en MozoDeTurnoAdapter. */
     private static final ZoneId ZONA = ZoneId.of("America/Argentina/Buenos_Aires");
@@ -60,15 +70,17 @@ public class GestionarEmpleadosService {
     private final EmpleadoRepository empleados;
     private final UsuarioRepository usuarios;
     private final RolRepository roles;
+    private final MesasDelLocal mesas;
     private final CodificadorDeClaves codificador;
     private final Auditor auditor;
     private final Reloj reloj;
 
     public GestionarEmpleadosService(EmpleadoRepository empleados, UsuarioRepository usuarios, RolRepository roles,
-            CodificadorDeClaves codificador, Auditor auditor, Reloj reloj) {
+            MesasDelLocal mesas, CodificadorDeClaves codificador, Auditor auditor, Reloj reloj) {
         this.empleados = empleados;
         this.usuarios = usuarios;
         this.roles = roles;
+        this.mesas = mesas;
         this.codificador = codificador;
         this.auditor = auditor;
         this.reloj = reloj;
@@ -162,11 +174,7 @@ public class GestionarEmpleadosService {
     @Transactional
     public EmpleadoDetalleDto editar(UsuarioAutenticado usuario, Long empleadoId, DatosDeEdicionDeEmpleado datos) {
         Long localId = localDe(usuario);
-        Empleado empleado = empleados.buscarParaModificar(empleadoId, localId)
-                .orElseThrow(() -> new NoEncontradoException(NO_EXISTE));
-        if (!empleado.estaActivo()) {
-            throw new ReglaDeNegocioException(DADO_DE_BAJA);
-        }
+        Empleado empleado = modificable(empleadoId, localId);
         String nombre = nombreValido(datos.nombre());
         String nombreUsuario = textoOVacio(datos.nombreUsuario());
         if (empleado.getUsuario().getRol().esMozo()) {
@@ -206,8 +214,175 @@ public class GestionarEmpleadosService {
                 Map.of("activo", true), Map.of("activo", false));
     }
 
+    /**
+     * Reemplaza la plantilla semanal entera; la lista vacía lo deja sin turnos. Un turno que termina a una hora menor
+     * que la de inicio sigue al día siguiente (P-23c). Si no cambió nada, no guarda ni audita.
+     *
+     * @throws SolicitudInvalidaException si a un turno le falta un dato, empieza y termina a la misma hora o se pisa
+     *                                    con otro
+     * @throws ReglaDeNegocioException    si está dado de baja (409)
+     */
+    @Transactional
+    public EmpleadoDetalleDto reemplazarTurnos(UsuarioAutenticado usuario, Long empleadoId, List<DatosDeTurno> datos) {
+        Long localId = localDe(usuario);
+        Empleado empleado = modificable(empleadoId, localId);
+        if (datos == null) {
+            throw new SolicitudInvalidaException("Faltan los turnos");
+        }
+        List<Turno> nuevos = datos.stream().map(d -> turno(localId, empleado, d)).toList();
+        Turno.verificarQueNoSePisan(nuevos);
+
+        List<String> antes = descripciones(empleados.turnosDe(List.of(empleado.getId()), localId));
+        List<String> despues = descripciones(nuevos);
+        if (!antes.equals(despues)) {
+            empleados.reemplazarTurnos(empleado.getId(), localId, nuevos);
+            auditor.registrar(localId, usuario.usuarioId(), "CAMBIAR_TURNOS", ENTIDAD, empleado.getId(),
+                    Map.of("turnos", antes), Map.of("turnos", despues));
+        }
+        return aDetalle(empleado, localId);
+    }
+
+    /**
+     * Reemplaza las mesas del mozo; la lista vacía lo deja sin mesas. Una mesa puede tener varios mozos (CP-27-02).
+     * Si una no existe o es de otro local, no se guarda ninguna. Si no cambió nada, no audita.
+     *
+     * @throws SolicitudInvalidaException si no es mozo o falta una mesa
+     * @throws ReglaDeNegocioException    si está dado de baja (409)
+     * @throws NoEncontradoException      si una mesa no es del local
+     */
+    @Transactional
+    public EmpleadoDetalleDto reemplazarMesas(UsuarioAutenticado usuario, Long empleadoId, List<Long> mesaIds) {
+        Long localId = localDe(usuario);
+        Empleado empleado = modificable(empleadoId, localId);
+        if (!empleado.getUsuario().getRol().esMozo()) {
+            throw new SolicitudInvalidaException("Solo el mozo tiene mesas asignadas");
+        }
+        if (mesaIds == null) {
+            throw new SolicitudInvalidaException("Faltan las mesas");
+        }
+        if (mesaIds.stream().anyMatch(Objects::isNull)) {
+            throw new SolicitudInvalidaException("Falta el id de una mesa");
+        }
+        Set<Long> pedidas = new TreeSet<>(mesaIds);
+        if (!pedidas.isEmpty() && !mesas.deEsteLocal(pedidas, localId).containsAll(pedidas)) {
+            throw new NoEncontradoException(MESA_NO_EXISTE);
+        }
+
+        List<Long> antes = empleado.getMesaIds().stream().sorted().toList();
+        // El empleado está gestionado: al cerrar la transacción se borran las que salieron y se insertan las nuevas.
+        if (empleado.reemplazarMesas(pedidas)) {
+            auditor.registrar(localId, usuario.usuarioId(), "CAMBIAR_MESAS", ENTIDAD, empleado.getId(),
+                    Map.of("mesaIds", antes), Map.of("mesaIds", List.copyOf(pedidas)));
+        }
+        return aDetalle(empleado, localId);
+    }
+
+    /** Las ausencias del empleado, de la más nueva a la más vieja. También las de un dado de baja. */
+    @Transactional(readOnly = true)
+    public List<AusenciaDto> ausencias(UsuarioAutenticado usuario, Long empleadoId) {
+        Long localId = localDe(usuario);
+        Empleado empleado = buscar(empleadoId, localId);
+        return aAusenciasDto(empleados.ausenciasDe(empleado.getId(), localId));
+    }
+
+    /**
+     * Carga una ausencia, con o sin fecha de vuelta. La firma el Admin de la sesión.
+     *
+     * @throws SolicitudInvalidaException si falta el tipo o el inicio, o si termina antes de empezar
+     * @throws ReglaDeNegocioException    si está dado de baja (409)
+     */
+    @Transactional
+    public AusenciaDto cargarAusencia(UsuarioAutenticado usuario, Long empleadoId, DatosDeAusencia datos) {
+        Long localId = localDe(usuario);
+        Empleado empleado = modificable(empleadoId, localId);
+        Ausencia ausencia = empleados.guardarAusencia(new Ausencia(localId, empleado, tipo(datos.tipo()),
+                datos.desde(), datos.hasta(), usuario.usuarioId()));
+
+        Map<String, Object> valores = new LinkedHashMap<>();
+        valores.put("empleadoId", empleado.getId());
+        valores.put("tipo", ausencia.getTipo().name());
+        valores.put("desde", ausencia.getDesde().toString());
+        valores.put("hasta", texto(ausencia.getHasta()));
+        auditor.registrar(localId, usuario.usuarioId(), "CREAR_AUSENCIA", ENTIDAD_AUSENCIA, ausencia.getId(), null,
+                valores);
+        return aAusenciaDto(ausencia);
+    }
+
+    /**
+     * Termina la ausencia o cambia su fecha de vuelta. No se borra: así queda de cuándo a cuándo faltó. Si ya
+     * terminaba ese día, no guarda ni audita.
+     *
+     * @throws SolicitudInvalidaException si falta la fecha o es anterior al inicio
+     * @throws ReglaDeNegocioException    si el empleado está dado de baja (409)
+     * @throws NoEncontradoException      si la ausencia no es de ese empleado o de ese local
+     */
+    @Transactional
+    public AusenciaDto cambiarFinDeAusencia(UsuarioAutenticado usuario, Long empleadoId, Long ausenciaId,
+            LocalDate hasta) {
+        Long localId = localDe(usuario);
+        Empleado empleado = modificable(empleadoId, localId);
+        Ausencia ausencia = empleados.buscarAusencia(ausenciaId, empleado.getId(), localId)
+                .orElseThrow(() -> new NoEncontradoException(AUSENCIA_NO_EXISTE));
+        String antes = texto(ausencia.getHasta());
+        if (ausencia.cambiarHasta(hasta)) {
+            empleados.guardarAusencia(ausencia);
+            auditor.registrar(localId, usuario.usuarioId(), "EDITAR_AUSENCIA", ENTIDAD_AUSENCIA, ausencia.getId(),
+                    Collections.singletonMap("hasta", antes), Map.of("hasta", hasta.toString()));
+        }
+        return aAusenciaDto(ausencia);
+    }
+
     private Empleado buscar(Long empleadoId, Long localId) {
         return empleados.buscarPorId(empleadoId, localId).orElseThrow(() -> new NoEncontradoException(NO_EXISTE));
+    }
+
+    /** Para cambiarlo: con la fila bloqueada, y un dado de baja queda de solo lectura. */
+    private Empleado modificable(Long empleadoId, Long localId) {
+        Empleado empleado = empleados.buscarParaModificar(empleadoId, localId)
+                .orElseThrow(() -> new NoEncontradoException(NO_EXISTE));
+        if (!empleado.estaActivo()) {
+            throw new ReglaDeNegocioException(DADO_DE_BAJA);
+        }
+        return empleado;
+    }
+
+    private static Turno turno(Long localId, Empleado empleado, DatosDeTurno datos) {
+        if (datos == null) {
+            throw new SolicitudInvalidaException("Falta un turno");
+        }
+        return new Turno(localId, empleado, dia(datos.dia()), datos.horaInicio(), datos.horaFin());
+    }
+
+    /** Llega como texto, así un día inventado da el 400 con mensaje y no el genérico de Jackson. */
+    private static DiaSemana dia(String dia) {
+        if (dia == null || dia.isBlank()) {
+            throw new SolicitudInvalidaException("Falta el día del turno");
+        }
+        try {
+            return DiaSemana.valueOf(dia.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new SolicitudInvalidaException("El día tiene que ser LUN, MAR, MIE, JUE, VIE, SAB o DOM");
+        }
+    }
+
+    private static TipoAusencia tipo(String tipo) {
+        if (tipo == null || tipo.isBlank()) {
+            throw new SolicitudInvalidaException("Falta el tipo de ausencia");
+        }
+        try {
+            return TipoAusencia.valueOf(tipo.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new SolicitudInvalidaException("El tipo tiene que ser VACACIONES, FRANCO o BAJA_TEMPORAL");
+        }
+    }
+
+    /** Para la auditoría y para ver si cambió algo: "LUN 12:00-16:00", en orden. */
+    private static List<String> descripciones(List<Turno> turnos) {
+        return turnos.stream().sorted(Turno.EN_ORDEN).map(Turno::describir).toList();
+    }
+
+    private static String texto(LocalDate fecha) {
+        return fecha == null ? null : fecha.toString();
     }
 
     private void verificarQueNoExiste(Long localId, String nombreUsuario, Long excluirUsuarioId) {
@@ -250,9 +425,7 @@ public class GestionarEmpleadosService {
     private EmpleadoDetalleDto aDetalle(Empleado empleado, Long localId) {
         Usuario u = empleado.getUsuario();
         List<TurnoDto> turnos = aTurnosDto(empleados.turnosDe(List.of(empleado.getId()), localId));
-        List<AusenciaDto> ausencias = empleados.ausenciasDe(empleado.getId(), localId).stream()
-                .map(a -> new AusenciaDto(a.getId(), a.getTipo(), a.getDesde(), a.getHasta()))
-                .toList();
+        List<AusenciaDto> ausencias = aAusenciasDto(empleados.ausenciasDe(empleado.getId(), localId));
         LocalDate hoy = hoy();
         boolean vigente = ausencias.stream()
                 .anyMatch(a -> !a.desde().isAfter(hoy) && (a.hasta() == null || !a.hasta().isBefore(hoy)));
@@ -265,9 +438,17 @@ public class GestionarEmpleadosService {
     /** Por día de la semana y después por hora de inicio. */
     private static List<TurnoDto> aTurnosDto(List<Turno> turnos) {
         return turnos.stream()
-                .sorted(Comparator.comparing(Turno::getDiaSemana).thenComparing(Turno::getHoraInicio))
+                .sorted(Turno.EN_ORDEN)
                 .map(t -> new TurnoDto(t.getDiaSemana(), t.getHoraInicio(), t.getHoraFin()))
                 .toList();
+    }
+
+    private static List<AusenciaDto> aAusenciasDto(List<Ausencia> ausencias) {
+        return ausencias.stream().map(GestionarEmpleadosService::aAusenciaDto).toList();
+    }
+
+    private static AusenciaDto aAusenciaDto(Ausencia a) {
+        return new AusenciaDto(a.getId(), a.getTipo(), a.getDesde(), a.getHasta());
     }
 
     private LocalDate hoy() {

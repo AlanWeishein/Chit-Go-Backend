@@ -92,4 +92,11 @@ interface EmpleadoJpaRepository extends JpaRepository<Empleado, Long> {
             ORDER BY a.desde DESC, a.id DESC
             """)
     List<Ausencia> ausenciasDe(@Param("empleadoId") Long empleadoId, @Param("localId") Long localId);
+
+    /**
+     * Cuáles de esos ids son mesas del local. Mesa es de pedidos: se nombra en el JPQL sin importar la clase, como
+     * PedidoJpaRepository une Plato (la excepción del punto 2 del 20/10).
+     */
+    @Query("SELECT m.id FROM Mesa m WHERE m.id IN :ids AND m.localId = :localId")
+    Set<Long> mesasDelLocal(@Param("ids") Collection<Long> ids, @Param("localId") Long localId);
 }

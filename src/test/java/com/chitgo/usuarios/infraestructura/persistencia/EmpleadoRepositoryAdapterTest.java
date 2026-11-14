@@ -3,6 +3,7 @@ package com.chitgo.usuarios.infraestructura.persistencia;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -17,19 +18,25 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
+import com.chitgo.usuarios.aplicacion.GestionarEmpleadosService;
 import com.chitgo.usuarios.dominio.Ausencia;
+import com.chitgo.usuarios.dominio.DiaSemana;
 import com.chitgo.usuarios.dominio.Empleado;
 import com.chitgo.usuarios.dominio.PaginaDe;
 import com.chitgo.usuarios.dominio.Rol;
 import com.chitgo.usuarios.dominio.TipoAusencia;
+import com.chitgo.usuarios.dominio.Turno;
 import com.chitgo.usuarios.dominio.Usuario;
+import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 import com.chitgo.usuarios.dominio.puertos.EmpleadoRepository;
+import com.chitgo.usuarios.dominio.puertos.MesasDelLocal;
 import com.chitgo.usuarios.dominio.puertos.RolRepository;
 import com.chitgo.usuarios.dominio.puertos.UsuarioRepository;
 
 /**
- * El listado de empleados y sus consultas de HU-14 (tarea 1 de la ST-22) contra el MySQL del Compose y la seed:
+ * El listado de empleados y sus consultas de HU-14 (tareas 1 y 2 de la ST-22) contra el MySQL del Compose y la seed:
  * La Esquina tiene a Ana, Carla, Hugo y Juan (y el Admin, que no se gestiona), y El Puerto a su Juan. Cada test
  * corre en una transacción que se deshace al terminar, así la base queda como la seed.
  */
@@ -46,6 +53,12 @@ class EmpleadoRepositoryAdapterTest {
 
     @Autowired
     private RolRepository roles;
+
+    @Autowired
+    private MesasDelLocal mesas;
+
+    @Autowired
+    private GestionarEmpleadosService servicio;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -412,5 +425,150 @@ class EmpleadoRepositoryAdapterTest {
     void v6_flyway_la_aplico_con_exito() {
         assertThat(jdbc.queryForObject("SELECT success FROM flyway_schema_history WHERE version = '6'",
                 Boolean.class)).isTrue();
+    }
+
+    // --- Tarea 2: las mesas del local
+
+    private Long mesa(String numero, Long localId) {
+        return jdbc.queryForObject("SELECT id FROM mesa WHERE numero = ? AND local_id = ?", Long.class, numero,
+                localId);
+    }
+
+    private List<Long> mozosDeLaMesa(Long mesaId) {
+        return jdbc.queryForList("SELECT empleado_id FROM mozo_mesa WHERE mesa_id = ? ORDER BY empleado_id",
+                Long.class, mesaId);
+    }
+
+    private List<Long> mesasDe(Long empleadoId) {
+        return jdbc.queryForList("SELECT mesa_id FROM mozo_mesa WHERE empleado_id = ? ORDER BY mesa_id", Long.class,
+                empleadoId);
+    }
+
+    private UsuarioAutenticado adminDeLaEsquina() {
+        Long id = jdbc.queryForObject("SELECT id FROM usuario WHERE email = 'admin@laesquina.test'", Long.class);
+        return new UsuarioAutenticado(id, "ADMIN", esquina(), false, Instant.now().plusSeconds(600));
+    }
+
+    @Test
+    void las_seis_mesas_de_la_esquina_son_del_local_y_las_de_el_puerto_no() {
+        List<Long> deLaEsquina = List.of("1", "2", "3", "4", "5", "6").stream().map(n -> mesa(n, esquina())).toList();
+        Long delPuerto = mesa("1", puerto());
+
+        assertThat(mesas.deEsteLocal(deLaEsquina, esquina())).containsExactlyInAnyOrderElementsOf(deLaEsquina);
+        assertThat(mesas.deEsteLocal(List.of(delPuerto, deLaEsquina.get(0)), esquina()))
+                .containsExactly(deLaEsquina.get(0));
+        assertThat(mesas.deEsteLocal(List.of(delPuerto), puerto())).containsExactly(delPuerto);
+        assertThat(mesas.deEsteLocal(deLaEsquina, puerto())).isEmpty();
+    }
+
+    @Test
+    void una_mesa_que_no_existe_no_es_del_local_y_sin_ids_no_consulta() {
+        assertThat(mesas.deEsteLocal(List.of(999_999L), esquina())).isEmpty();
+        assertThat(mesas.deEsteLocal(List.of(), esquina())).isEmpty();
+    }
+
+    @Test
+    void CP_27_02_la_mesa_3_queda_con_juan_ana_y_pedro_y_la_fila_lleva_el_local() {
+        Long m3 = mesa("3", esquina());
+        Empleado pedro = alta(esquina(), "MOZO", "Pedro", "pedro");
+        Empleado gestionado = empleados.buscarParaModificar(pedro.getId(), esquina()).orElseThrow();
+
+        gestionado.reemplazarMesas(Set.of(m3, mesa("5", esquina())));
+        em.flush();
+
+        assertThat(mozosDeLaMesa(m3)).containsExactlyInAnyOrder(empleadoId("Juan", esquina()), empleadoId("Ana", esquina()),
+                pedro.getId());
+        assertThat(jdbc.queryForList("SELECT DISTINCT local_id FROM mozo_mesa WHERE empleado_id = ?", Long.class,
+                pedro.getId())).containsExactly(esquina());
+    }
+
+    @Test
+    void reemplazar_las_mesas_de_juan_borra_las_que_salen_y_no_toca_las_de_ana() {
+        Long juan = empleadoId("Juan", esquina());
+        Long m2 = mesa("2", esquina());
+        Empleado gestionado = empleados.buscarParaModificar(juan, esquina()).orElseThrow();
+
+        gestionado.reemplazarMesas(Set.of(m2));
+        em.flush();
+
+        assertThat(mesasDe(juan)).containsExactly(m2);
+        assertThat(mozosDeLaMesa(mesa("3", esquina()))).containsExactly(empleadoId("Ana", esquina()));
+    }
+
+    @Test
+    void el_service_con_una_mesa_de_el_puerto_da_404_y_no_guarda_ninguna() {
+        Long juan = empleadoId("Juan", esquina());
+        List<Long> antes = mesasDe(juan);
+
+        assertThrows(NoEncontradoException.class, () -> servicio.reemplazarMesas(adminDeLaEsquina(), juan,
+                List.of(mesa("5", esquina()), mesa("1", puerto()))));
+        em.flush();
+
+        assertThat(mesasDe(juan)).isEqualTo(antes);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM registro_auditoria WHERE accion = 'CAMBIAR_MESAS'",
+                Integer.class)).isZero();
+    }
+
+    @Test
+    void el_service_asigna_las_mesas_del_local_y_audita() {
+        Long juan = empleadoId("Juan", esquina());
+        Long m5 = mesa("5", esquina());
+
+        servicio.reemplazarMesas(adminDeLaEsquina(), juan, List.of(m5));
+        em.flush();
+
+        assertThat(mesasDe(juan)).containsExactly(m5);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM registro_auditoria WHERE accion = 'CAMBIAR_MESAS'",
+                Integer.class)).isEqualTo(1);
+    }
+
+    // --- Tarea 2: turnos y ausencias
+
+    @Test
+    void CP_27_06_reemplazar_los_turnos_de_juan_deja_solo_el_de_20_a_02_tal_cual() {
+        Long juan = empleadoId("Juan", esquina());
+        Empleado gestionado = empleados.buscarParaModificar(juan, esquina()).orElseThrow();
+        assertThat(empleados.turnosDe(List.of(juan), esquina())).hasSize(7);
+
+        empleados.reemplazarTurnos(juan, esquina(), List.of(new Turno(esquina(), gestionado, DiaSemana.LUN,
+                LocalTime.of(20, 0), LocalTime.of(2, 0))));
+        em.flush();
+
+        assertThat(jdbc.queryForList("SELECT CONCAT(dia_semana, ' ', hora_inicio, '-', hora_fin) FROM turno "
+                + "WHERE empleado_id = ?", String.class, juan)).containsExactly("LUN 20:00:00-02:00:00");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM turno WHERE empleado_id = ?", Integer.class,
+                empleadoId("Ana", esquina()))).isEqualTo(7);
+    }
+
+    @Test
+    void reemplazar_por_ninguno_lo_deja_sin_turnos() {
+        Long juan = empleadoId("Juan", esquina());
+
+        empleados.reemplazarTurnos(juan, esquina(), List.of());
+        em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM turno WHERE empleado_id = ?", Integer.class, juan))
+                .isZero();
+    }
+
+    @Test
+    void la_ausencia_se_busca_por_empleado_y_por_local_y_su_fin_se_guarda() {
+        Empleado ana = empleados.buscarPorId(empleadoId("Ana", esquina()), esquina()).orElseThrow();
+        Long admin = adminDeLaEsquina().usuarioId();
+        Ausencia vacaciones = empleados.guardarAusencia(new Ausencia(esquina(), ana, TipoAusencia.VACACIONES,
+                LocalDate.of(2026, 11, 14), null, admin));
+
+        assertThat(empleados.buscarAusencia(vacaciones.getId(), ana.getId(), esquina())).isPresent();
+        assertThat(empleados.buscarAusencia(vacaciones.getId(), empleadoId("Juan", esquina()), esquina())).isEmpty();
+        assertThat(empleados.buscarAusencia(vacaciones.getId(), ana.getId(), puerto())).isEmpty();
+
+        vacaciones.cambiarHasta(LocalDate.of(2026, 11, 20));
+        empleados.guardarAusencia(vacaciones);
+        em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT hasta FROM ausencia WHERE id = ?", LocalDate.class,
+                vacaciones.getId())).isEqualTo(LocalDate.of(2026, 11, 20));
+        assertThat(jdbc.queryForObject("SELECT creada_por_usuario_id FROM ausencia WHERE id = ?", Long.class,
+                vacaciones.getId())).isEqualTo(admin);
     }
 }

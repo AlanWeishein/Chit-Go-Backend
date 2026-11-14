@@ -53,6 +53,7 @@ import com.chitgo.usuarios.dominio.Usuario;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 import com.chitgo.usuarios.dominio.puertos.CodificadorDeClaves;
 import com.chitgo.usuarios.dominio.puertos.EmpleadoRepository;
+import com.chitgo.usuarios.dominio.puertos.MesasDelLocal;
 import com.chitgo.usuarios.dominio.puertos.RolRepository;
 import com.chitgo.usuarios.dominio.puertos.UsuarioRepository;
 
@@ -83,7 +84,8 @@ class GestionarEmpleadosServiceTest {
 
     @BeforeEach
     void preparar() {
-        servicio = new GestionarEmpleadosService(empleados, usuarios, roles, codificador, auditor, reloj);
+        servicio = new GestionarEmpleadosService(empleados, usuarios, roles, mock(MesasDelLocal.class), codificador,
+                auditor, reloj);
         juan = empleado(1L, 10L, "MOZO", "Juan", "juan");
         carla = empleado(2L, 11L, "CAJA", "Carla", null);
         hugo = empleado(3L, 12L, "COCINA", "Hugo", null);
