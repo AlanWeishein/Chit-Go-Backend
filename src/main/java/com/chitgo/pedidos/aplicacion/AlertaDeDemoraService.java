@@ -5,6 +5,7 @@ import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.pedidos.dominio.Demora;
 import com.chitgo.pedidos.dominio.EstadoPedido;
@@ -26,14 +27,17 @@ public class AlertaDeDemoraService {
     private final PedidosDemorados pedidosDemorados;
     private final PublicadorDeEventos eventos;
     private final Reloj reloj;
+    private final ReglasDelNegocio reglas;
 
     /** null hasta la primera pasada. */
     private Instant pasadaAnterior;
 
-    public AlertaDeDemoraService(PedidosDemorados pedidosDemorados, PublicadorDeEventos eventos, Reloj reloj) {
+    public AlertaDeDemoraService(PedidosDemorados pedidosDemorados, PublicadorDeEventos eventos, Reloj reloj,
+                                 ReglasDelNegocio reglas) {
         this.pedidosDemorados = pedidosDemorados;
         this.eventos = eventos;
         this.reloj = reloj;
+        this.reglas = reglas;
     }
 
     /**
@@ -54,7 +58,8 @@ public class AlertaDeDemoraService {
         }
         // Si la consulta falla, la excepción corta acá y la hora no avanza: la pasada siguiente mira esta ventana.
         for (PedidoPendiente p : pedidosDemorados.pendientesEnviadosEntre(
-                Demora.limiteDeEnvio(pasadaAnterior), Demora.limiteDeEnvio(ahora))) {
+                Demora.limiteDeEnvio(pasadaAnterior, reglas.demoraDelPedido()),
+                Demora.limiteDeEnvio(ahora, reglas.demoraDelPedido()))) {
             eventos.aCaja(p.localId(), EventoTiempoReal.de(TipoEvento.ALERTA_DEMORA, p.id(), p.mesaId(),
                     EstadoPedido.PENDIENTE_APROBACION.name(), null, ahora));
         }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.chitgo.usuarios.aplicacion.CerrarSesionService;
 import com.chitgo.usuarios.aplicacion.ConsultarDispositivoService;
 import com.chitgo.usuarios.aplicacion.ConsultarSesionService;
 import com.chitgo.usuarios.aplicacion.ElegirCredencialService;
@@ -39,19 +40,21 @@ public class AutenticacionController {
     private final HabilitarDispositivoService habilitarDispositivo;
     private final ConsultarDispositivoService consultarDispositivo;
     private final ElegirCredencialService elegirCredencial;
+    private final CerrarSesionService cerrarSesion;
     private final CookieDeSesion cookieDeSesion;
     private final CookieDeDispositivo cookieDeDispositivo;
 
     public AutenticacionController(ConsultarSesionService consultarSesion, IngresarConPinService ingresarConPin,
             IngresarConEmailService ingresarConEmail, HabilitarDispositivoService habilitarDispositivo,
             ConsultarDispositivoService consultarDispositivo, ElegirCredencialService elegirCredencial,
-            CookieDeSesion cookieDeSesion, CookieDeDispositivo cookieDeDispositivo) {
+            CerrarSesionService cerrarSesion, CookieDeSesion cookieDeSesion, CookieDeDispositivo cookieDeDispositivo) {
         this.consultarSesion = consultarSesion;
         this.ingresarConPin = ingresarConPin;
         this.ingresarConEmail = ingresarConEmail;
         this.habilitarDispositivo = habilitarDispositivo;
         this.consultarDispositivo = consultarDispositivo;
         this.elegirCredencial = elegirCredencial;
+        this.cerrarSesion = cerrarSesion;
         this.cookieDeSesion = cookieDeSesion;
         this.cookieDeDispositivo = cookieDeDispositivo;
     }
@@ -113,9 +116,13 @@ public class AutenticacionController {
         return consultarSesion.consultar(usuario);
     }
 
-    /** Un JWT no se puede revocar: cerrar la sesión es borrar la cookie. */
+    /**
+     * Borra la cookie y mueve el "válido desde" del usuario, así un token copiado antes da 401 (CP-13-01). Cierra
+     * la sesión en todos sus dispositivos. Con un token que ya no vale, la seguridad responde 401 antes de llegar.
+     */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal UsuarioAutenticado usuario) {
+        cerrarSesion.cerrar(usuario.usuarioId());
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cookieDeSesion.borrar().toString())
                 .build();

@@ -29,6 +29,28 @@ El dominio no depende de Spring, JPA ni WebSocket. Los controladores no tienen l
 2. `mvn spring-boot:run -Dspring-boot.run.profiles=dev`
 3. Probar: `GET http://localhost:8080/api/v1/ping`
 
+## Reglas del negocio
+
+Los números del negocio no están escritos en el código: salen de `chitgo.reglas` en `application.yml`, que lee
+`compartido/aplicacion/ReglasDelNegocio`. Si falta alguno, o falta toda la sección, el back arranca igual con el
+valor de hoy. Un valor que no tiene sentido (cero, negativo, una zona que no existe) no lo deja arrancar.
+
+| Propiedad | Qué hace | Por defecto |
+|---|---|---|
+| `demora-del-pedido` | Un pedido sin aprobar ni rechazar pasa a demorado después de esto (RF-16). Lo usan el `demorado` del `GET` de la cola y el aviso `ALERTA_DEMORA`. Va en segundos enteros. | `180s` |
+| `sesion-de-caja` | Cuánto dura la sesión de Caja, sin importar el T del local (RNF-14). | `1h` |
+| `sesion-sin-local` | Cuánto dura la sesión del Gerente/Dueño, que no tiene local ni T. | `10m` |
+| `vigencia-del-dispositivo` | Cada cuánto el mozo vuelve a entrar con usuario y contraseña: la cookie `chitgo_dispositivo` y su token (RF-13). | `7d` |
+| `intentos-para-bloquear` | Intentos fallidos seguidos, de PIN o de contraseña, para quedar bloqueado (RNF-07). | `5` |
+| `zona-horaria` | La zona del local: los turnos, las ausencias y la alerta de mesa sin mozo cuentan horas y días de acá, no de UTC. | `America/Argentina/Buenos_Aires` |
+
+- Los tiempos van con su unidad (`s`, `m`, `h`, `d`). Sin unidad, cada uno se lee en la suya: segundos la
+  demora, minutos las sesiones y días el dispositivo.
+- Se pueden pisar con variables de entorno, como cualquier propiedad de Spring: `CHITGO_REGLAS_INTENTOSPARABLOQUEAR=3`.
+- El T de inactividad de Mozo, Cocina y Admin no está acá: es de cada local (`minutos_inactividad_sesion`) y lo
+  configura el Admin.
+- Se leen al arrancar: para cambiar uno hay que reiniciar el back.
+
 ## Datos de prueba (dev)
 
 Con el perfil `dev`, Flyway además de las migraciones de `db/migration` corre
@@ -89,7 +111,7 @@ encabezado del SQL.
     dispositivo vigente. Hay que mostrar P-32 (ver abajo). No mira el PIN ni suma intentos. Comparar el
     `codigo`, no el texto del `detail`.
   - 423 "Tu usuario está bloqueado. Pedile al Admin que te blanquee el PIN.": al quinto intento fallido
-    seguido, y desde ahí también con el PIN correcto. No vence solo. Se mira antes que la cookie de
+    seguido (`intentos-para-bloquear`, ver "Reglas del negocio"), y desde ahí también con el PIN correcto. No vence solo. Se mira antes que la cookie de
     dispositivo: un mozo bloqueado ve el 423 aunque no tenga la cookie.
   - 404: el token de staff no existe, o el usuario no es de ese local, está dado de baja o no entra con
     PIN. No suma intentos.
@@ -106,8 +128,13 @@ encabezado del SQL.
   cookie `chitgo_dispositivo` (HttpOnly, SameSite=Strict, 7 días, `Path=/api/v1/auth`: viaja a todo lo que
   cuelga de esa ruta). **No abre la sesión**: después va el PIN de ese mozo con `/auth/pin`. Si no:
   - 401 "Usuario o contraseña incorrectos", siempre el mismo: el usuario no existe en ese local, la
-    contraseña está mal, o está bloqueado, dado de baja o no es mozo. La contraseña mal suma un intento, con
-    el mismo contador que el PIN, y al quinto queda bloqueado.
+    contraseña está mal, está dado de baja o no es mozo, o está bloqueado y la contraseña está mal. La
+    contraseña mal suma un intento, con el mismo contador que el PIN, y al quinto queda bloqueado.
+  - 423 "Tu usuario está bloqueado. Pedile al Admin que te blanquee el PIN.", el mismo texto de `/auth/pin`:
+    está bloqueado **y la contraseña es la correcta** (decidido el 20/10, punto 4). No deja la cookie de
+    dispositivo ni suma intentos. Así el bloqueo solo se lo cuenta a quien sabe la contraseña: con una
+    incorrecta sale el 401 de arriba. Los tres casos (bloqueado con la correcta, con la incorrecta y un usuario
+    que no existe) tardan lo mismo.
   - 404 "El QR de staff no es válido.": el token de staff no existe.
   - 400: falta un dato, el usuario pasa de 40 caracteres, o la contraseña no tiene de 8 a 64 caracteres o
     pasa de 72 bytes. No suma intentos.
@@ -150,8 +177,9 @@ encabezado del SQL.
 - El token dura T minutos y cada request con sesión lo renueva: la respuesta trae una cookie
   `chitgo_sesion` nueva con T contado desde ahí. A los T minutos sin actividad vence solo y lo próximo da
   401 "No hay una sesión iniciada, o venció.": el front vuelve al login.
-- T según el rol: Caja, 60 minutos (fijo); Mozo, Cocina y Admin, el del local
-  (`minutos_inactividad_sesion`, 10 por defecto); el Gerente/Dueño, 10.
+- T según el rol: Caja, 60 minutos (`sesion-de-caja`); Mozo, Cocina y Admin, el del local
+  (`minutos_inactividad_sesion`, 10 por defecto); el Gerente/Dueño, 10 (`sesion-sin-local`). Ver "Reglas del
+  negocio".
 - No renuevan: las públicas, `GET /auth/sesion` (consultarla no cuenta como actividad), `POST
   /auth/credencial` (deja su propia cookie nueva) y `POST /auth/logout` (la borra). Un login con la cookie
   de otro usuario todavía puesta deja solo la del que entra.
@@ -164,6 +192,23 @@ encabezado del SQL.
   logout vuelve a dejar la cookie del anterior.
 - La renovación mira la base: un usuario dado de baja da 401 en el próximo request, y uno al que le
   blanquearon la credencial da 403 con `CREDENCIAL_PROVISORIA`.
+
+### Cerrar sesión
+
+- `POST /api/v1/auth/logout` borra la cookie y **corta todas las sesiones del usuario**, no solo la de este
+  dispositivo (decidido el 20/10, punto 7): guarda en `usuario.sesion_valida_desde` la hora del logout, y
+  desde ahí cualquier token emitido antes da 401 "No hay una sesión iniciada, o venció.", también en
+  `/auth/sesion`. Un token copiado antes del logout ya no sirve (CP-13-01).
+- Un mozo con dos celulares los pierde a los dos al cerrar sesión en uno. En el otro, el próximo request da
+  401 y el front vuelve al login. Si en ese otro toca "cerrar sesión", también da 401 y la cookie queda puesta,
+  pero no sirve para nada.
+- Volver a entrar enseguida, en el mismo segundo del logout, funciona: el token nuevo vale.
+- El logout no borra la cookie de dispositivo del mozo: puede volver a entrar con el PIN.
+- Límites que quedan:
+  - Un token emitido en el mismo segundo del logout, pero antes, sigue entrando: la columna guarda segundos
+    enteros.
+  - **Un WebSocket abierto antes del logout no se corta**: sigue recibiendo eventos hasta que se cierra. Un
+    `CONNECT` nuevo con el token viejo sí da error.
 
 ## Cola de aprobación (para el front)
 
@@ -767,6 +812,43 @@ piden el permiso `plato.cambiar_disponibilidad`, que tienen Caja y el Admin: sin
 - `DisponibilidadDePlatosTest` recorre HU-09 contra el MySQL del Compose (CP-23-01 a CP-23-08, la cancelación
   de CP-23-02 con el lote de German, y CP-25-06), con el PIN de Carla y Hugo y el email del Admin. Lo que viaja
   por el WebSocket lo prueban `CambiarDisponibilidadServiceTest` y `AvisoDeDisponibilidadAdapterTest`.
+
+## Mesas sin mozo (para el front)
+
+HU-14. Una mesa habilitada está sin mozo cuando ninguno de sus mozos tiene turno ahora, con la hora del local
+(`zona-horaria`): un turno cuya hora de fin es menor que la de inicio termina al día siguiente, y una ausencia
+cuenta el día en que empezó el turno. Caja y el Admin se enteran por `/topic/local/{localId}/alertas`, que
+escuchan los dos (`pedido.aprobar_rechazar` o `empleado.gestionar`), de dos maneras, con el mismo evento:
+
+```json
+{"tipo": "MESA_SIN_MOZO", "pedidoId": null, "mesaId": 5, "cuentaId": null, "platoId": null, "estado": null,
+ "detalle": "La mesa 5 no tiene mozo de turno", "ocurridoEn": "2026-11-16T15:00:00Z"}
+```
+
+- **Al abrir la cuenta** (CP-01-09): si un cliente escanea el QR de una mesa sin mozo de turno, la cuenta se
+  abre igual, queda sin mozo y se avisa. Además se guarda un `Aviso` de la cuenta.
+- **Al empezar un turno** (CP-07-05): una vez por minuto, en el segundo 0 de la hora del local, si en ese minuto
+  empieza el turno de algún empleado activo de un local, se avisa cada mesa habilitada de ese local que se queda
+  sin mozo. Avisa una sola vez por turno, y solo al empezar: si un mozo termina su turno y la mesa se queda sin
+  nadie, no sale nada hasta que empiece otro. No se guarda un `Aviso`, porque a esa hora la mesa puede no tener
+  cuenta. Si el back está apagado en ese minuto, el aviso se pierde.
+- **`GET /api/v1/alertas/mesas-sin-mozo`**, al conectar o reconectar (RNF-08): las mesas habilitadas del local de
+  la sesión que ahora no tienen mozo de turno, ordenadas por número. Lo recalcula en cada llamada, así que es la
+  verdad aunque se haya perdido algún aviso.
+
+```json
+[{"id": 5, "numero": "5"}, {"id": 6, "numero": "6"}]
+```
+
+  - Lo pueden pedir los mismos que escuchan `/alertas`: Caja y el Admin. Sin sesión, 401. Cocina, el Mozo o el
+    Gerente/Dueño (que no tiene local), 403.
+  - El `numero` es texto: con mesas de dos cifras el orden queda 1, 10, 2, igual que en `GET /mozo/mesas`.
+- Las mesas inhabilitadas no avisan ni salen en el `GET`. El texto del `detalle` es el mismo en los tres casos:
+  el front no tiene que distinguir de dónde vino.
+- La tarea se prende y se apaga con `chitgo.alertas.mesa-sin-mozo.habilitada` (`true` por defecto). Los tests la
+  apagan y llaman a la pasada a mano con el reloj de prueba.
+- Lo prueban `MesaSinMozoTest` (CP-07-05, CP-01-09 y el `GET`, contra el MySQL del Compose), `MozoDeTurnoAdapterTest`
+  (los turnos que cruzan la medianoche) y `AlertaDeMesaSinMozoProgramadaTest` (que quede agendada cada minuto).
 
 ## Sprint 2: tareas de German
 

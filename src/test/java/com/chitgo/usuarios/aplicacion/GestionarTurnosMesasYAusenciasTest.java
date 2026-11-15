@@ -31,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.auditoria.dominio.puertos.Auditor;
 import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
@@ -86,7 +87,7 @@ class GestionarTurnosMesasYAusenciasTest {
     @BeforeEach
     void preparar() {
         servicio = new GestionarEmpleadosService(empleados, mock(UsuarioRepository.class), mock(RolRepository.class),
-                mesas, mock(CodificadorDeClaves.class), auditor, new RelojDePrueba(AHORA));
+                mesas, mock(CodificadorDeClaves.class), auditor, new RelojDePrueba(AHORA), ReglasDePrueba.DE_HOY);
         juan = empleado(1L, "MOZO", "Juan", "juan");
         carla = empleado(2L, "CAJA", "Carla", null);
         hugo = empleado(3L, "COCINA", "Hugo", null);

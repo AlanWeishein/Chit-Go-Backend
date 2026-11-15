@@ -83,9 +83,10 @@ class RenovacionDeSesionTest {
     @AfterEach
     void dejarLaSeedComoEstaba() {
         jdbc.update("UPDATE local SET minutos_inactividad_sesion = 10");
+        // El logout de un test deja el "válido desde" (ST-23, tarea 3).
         jdbc.update("""
                 UPDATE usuario SET debe_cambiar_credencial = FALSE, intentos_fallidos = 0, bloqueado_hasta = NULL,
-                activo = TRUE""");
+                activo = TRUE, sesion_valida_desde = NULL""");
     }
 
     // --- Corte por inactividad

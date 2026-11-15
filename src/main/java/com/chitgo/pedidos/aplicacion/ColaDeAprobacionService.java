@@ -8,6 +8,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.AccesoDenegadoException;
 import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.compartido.dominio.SolicitudInvalidaException;
@@ -28,10 +29,12 @@ public class ColaDeAprobacionService {
 
     private final PedidosPorAprobar pedidosPorAprobar;
     private final Reloj reloj;
+    private final ReglasDelNegocio reglas;
 
-    public ColaDeAprobacionService(PedidosPorAprobar pedidosPorAprobar, Reloj reloj) {
+    public ColaDeAprobacionService(PedidosPorAprobar pedidosPorAprobar, Reloj reloj, ReglasDelNegocio reglas) {
         this.pedidosPorAprobar = pedidosPorAprobar;
         this.reloj = reloj;
+        this.reglas = reglas;
     }
 
     /** Los pendientes del local, del más viejo al más nuevo. Por ahora la cola es solo de PENDIENTE_APROBACION. */
@@ -56,10 +59,11 @@ public class ColaDeAprobacionService {
         return usuario.localId();
     }
 
-    private static PedidoPorAprobarDto aDto(PedidoPorAprobar p, Instant ahora) {
+    private PedidoPorAprobarDto aDto(PedidoPorAprobar p, Instant ahora) {
         // demorado sale de los mismos segundos que se muestran, así los dos campos nunca se contradicen.
         long segundos = Math.max(0, Duration.between(p.enviadoEn(), ahora).getSeconds());
-        return new PedidoPorAprobarDto(p.id(), p.mesa(), p.enviadoEn(), segundos, Demora.estaDemorado(segundos),
+        return new PedidoPorAprobarDto(p.id(), p.mesa(), p.enviadoEn(), segundos,
+                Demora.estaDemorado(segundos, reglas.demoraDelPedido()),
                 p.items().stream()
                         .map(i -> new ItemPorAprobarDto(i.platoId(), i.plato(), i.cantidad(), i.observacion(),
                                 i.disponible()))

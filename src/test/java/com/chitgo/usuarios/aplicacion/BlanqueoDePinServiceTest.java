@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.auditoria.dominio.puertos.Auditor;
 import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
@@ -68,11 +69,11 @@ class BlanqueoDePinServiceTest {
     @BeforeEach
     void preparar() {
         servicio = new GestionarEmpleadosService(empleados, usuarios, mock(RolRepository.class),
-                mock(MesasDelLocal.class), codificador, auditor, new RelojDePrueba(AHORA));
+                mock(MesasDelLocal.class), codificador, auditor, new RelojDePrueba(AHORA), ReglasDePrueba.DE_HOY);
         juan = empleado(1L, 10L, "MOZO", "Juan", "juan");
         juan.getUsuario().elegirCredencial("pinElegido", "passElegida");
-        for (int i = 0; i < Usuario.INTENTOS_PARA_BLOQUEAR; i++) {
-            juan.getUsuario().registrarIntentoFallido();
+        for (int i = 0; i < ReglasDePrueba.DE_HOY.intentosParaBloquear(); i++) {
+            juan.getUsuario().registrarIntentoFallido(ReglasDePrueba.DE_HOY.intentosParaBloquear());
         }
         pedro = empleado(2L, 11L, "MOZO", "Pedro", "pedro");
         hugo = empleado(3L, 12L, "COCINA", "Hugo", null);
