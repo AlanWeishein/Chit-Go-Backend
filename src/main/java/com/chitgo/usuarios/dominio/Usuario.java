@@ -20,9 +20,6 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "usuario")
 public class Usuario {
 
-    /** RNF-07: a los 5 intentos fallidos seguidos queda bloqueado. */
-    public static final int INTENTOS_PARA_BLOQUEAR = 5;
-
     /**
      * El bloqueo por intentos no vence solo: dura hasta que el Admin blanquea el PIN (HU-14), que pone
      * bloqueadoHasta en NULL. Como la columna es "hasta", se guarda una fecha que no llega nunca. Es 2038
@@ -163,10 +160,14 @@ public class Usuario {
         return bloqueadoHasta != null && ahora.isBefore(bloqueadoHasta);
     }
 
-    /** Un intento fallido más. Al quinto seguido queda bloqueado sin vencimiento. */
-    public void registrarIntentoFallido() {
+    /**
+     * Un intento fallido más. Al llegar a {@code intentosParaBloquear} seguidos queda bloqueado sin vencimiento
+     * (RNF-07). El número lo pasa el service, que lo lee de {@code chitgo.reglas.intentos-para-bloquear}: 5 por
+     * defecto. Va por parámetro porque una entidad no recibe propiedades de Spring.
+     */
+    public void registrarIntentoFallido(int intentosParaBloquear) {
         intentosFallidos++;
-        if (intentosFallidos >= INTENTOS_PARA_BLOQUEAR) {
+        if (intentosFallidos >= intentosParaBloquear) {
             bloqueadoHasta = BLOQUEO_SIN_VENCIMIENTO;
         }
     }

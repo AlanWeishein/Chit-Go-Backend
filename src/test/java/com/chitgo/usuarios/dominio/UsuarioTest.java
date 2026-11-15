@@ -95,9 +95,23 @@ class UsuarioTest {
         assertThat(pedro.getHashPassword()).isEqualTo("contrasena");
     }
 
+    /** El número sale de chitgo.reglas.intentos-para-bloquear: con 3, al tercero ya queda bloqueado. */
+    @Test
+    void conTresIntentosParaBloquearAlTerceroQuedaBloqueado() {
+        juan.registrarIntentoFallido(3);
+        juan.registrarIntentoFallido(3);
+        assertThat(juan.estaBloqueado(AHORA)).isFalse();
+
+        juan.registrarIntentoFallido(3);
+
+        assertThat(juan.getIntentosFallidos()).isEqualTo((short) 3);
+        assertThat(juan.getBloqueadoHasta()).isEqualTo(Usuario.BLOQUEO_SIN_VENCIMIENTO);
+    }
+
+    /** Con los 5 de hoy (RNF-07), el valor por defecto de la propiedad. */
     private void fallar(int veces) {
         for (int i = 0; i < veces; i++) {
-            juan.registrarIntentoFallido();
+            juan.registrarIntentoFallido(5);
         }
     }
 

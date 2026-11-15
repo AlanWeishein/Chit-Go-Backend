@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.mockito.ArgumentCaptor;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.auditoria.dominio.puertos.Auditor;
 import com.chitgo.compartido.dominio.AccesoDenegadoException;
 import com.chitgo.compartido.dominio.NoEncontradoException;
@@ -85,7 +86,7 @@ class GestionarEmpleadosServiceTest {
     @BeforeEach
     void preparar() {
         servicio = new GestionarEmpleadosService(empleados, usuarios, roles, mock(MesasDelLocal.class), codificador,
-                auditor, reloj);
+                auditor, reloj, ReglasDePrueba.DE_HOY);
         juan = empleado(1L, 10L, "MOZO", "Juan", "juan");
         carla = empleado(2L, 11L, "CAJA", "Carla", null);
         hugo = empleado(3L, 12L, "COCINA", "Hugo", null);
@@ -500,8 +501,8 @@ class GestionarEmpleadosServiceTest {
 
     @Test
     void el_detalle_marca_el_bloqueo() {
-        for (int i = 0; i < Usuario.INTENTOS_PARA_BLOQUEAR; i++) {
-            juan.getUsuario().registrarIntentoFallido();
+        for (int i = 0; i < ReglasDePrueba.DE_HOY.intentosParaBloquear(); i++) {
+            juan.getUsuario().registrarIntentoFallido(ReglasDePrueba.DE_HOY.intentosParaBloquear());
         }
 
         assertTrue(servicio.detalle(ADMIN, 1L).bloqueado());

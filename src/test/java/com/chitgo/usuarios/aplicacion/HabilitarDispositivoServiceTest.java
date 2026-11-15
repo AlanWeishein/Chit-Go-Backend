@@ -17,6 +17,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.compartido.dominio.RelojDePrueba;
 import com.chitgo.usuarios.dominio.Local;
 import com.chitgo.usuarios.dominio.Rol;
@@ -54,14 +55,14 @@ class HabilitarDispositivoServiceTest {
         Local laEsquina = conId(new Local(1L, "La Esquina", "Calle 1", TOKEN), 1L);
         juan = conId(new Usuario(1L, new Rol("MOZO", "Mozo"), "Juan", "juan", null, "hashPass", "hashPin"), 10L);
         juan.elegirCredencial(null, null);
-        for (int i = 0; i < Usuario.INTENTOS_PARA_BLOQUEAR; i++) {
-            juan.registrarIntentoFallido();
+        for (int i = 0; i < ReglasDePrueba.DE_HOY.intentosParaBloquear(); i++) {
+            juan.registrarIntentoFallido(ReglasDePrueba.DE_HOY.intentosParaBloquear());
         }
         when(locales.buscarPorTokenStaff(TOKEN)).thenReturn(Optional.of(laEsquina));
         when(usuarios.buscarPorNombreDeUsuarioParaIngreso(1L, "juan")).thenReturn(Optional.of(juan));
         when(codificador.hashear(anyString())).thenReturn("relleno");
         when(codificador.verificar(CORRECTA, "hashPass")).thenReturn(true);
-        servicio = new HabilitarDispositivoService(locales, usuarios, codificador, emisor, reloj);
+        servicio = new HabilitarDispositivoService(locales, usuarios, codificador, emisor, reloj, ReglasDePrueba.DE_HOY);
     }
 
     @Test
@@ -72,7 +73,7 @@ class HabilitarDispositivoServiceTest {
         assertEquals("Tu usuario está bloqueado. Pedile al Admin que te blanquee el PIN.", e.getMessage());
         verify(emisor, never()).emitir(any());
         // Sigue bloqueado: el 423 no es un ingreso.
-        assertEquals(Usuario.INTENTOS_PARA_BLOQUEAR, juan.getIntentosFallidos());
+        assertEquals(ReglasDePrueba.DE_HOY.intentosParaBloquear(), juan.getIntentosFallidos());
         assertEquals(Usuario.BLOQUEO_SIN_VENCIMIENTO, juan.getBloqueadoHasta());
     }
 
@@ -82,7 +83,7 @@ class HabilitarDispositivoServiceTest {
                 () -> servicio.habilitar(TOKEN, "juan", INCORRECTA));
 
         verify(emisor, never()).emitir(any());
-        assertEquals(Usuario.INTENTOS_PARA_BLOQUEAR, juan.getIntentosFallidos());
+        assertEquals(ReglasDePrueba.DE_HOY.intentosParaBloquear(), juan.getIntentosFallidos());
     }
 
     @Test

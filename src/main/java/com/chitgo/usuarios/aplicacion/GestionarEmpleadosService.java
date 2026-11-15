@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.chitgo.auditoria.dominio.puertos.Auditor;
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.AccesoDenegadoException;
 import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
@@ -70,9 +71,11 @@ public class GestionarEmpleadosService {
     private final CodificadorDeClaves codificador;
     private final Auditor auditor;
     private final Reloj reloj;
+    private final ReglasDelNegocio reglas;
 
     public GestionarEmpleadosService(EmpleadoRepository empleados, UsuarioRepository usuarios, RolRepository roles,
-            MesasDelLocal mesas, CodificadorDeClaves codificador, Auditor auditor, Reloj reloj) {
+            MesasDelLocal mesas, CodificadorDeClaves codificador, Auditor auditor, Reloj reloj,
+            ReglasDelNegocio reglas) {
         this.empleados = empleados;
         this.usuarios = usuarios;
         this.roles = roles;
@@ -80,6 +83,7 @@ public class GestionarEmpleadosService {
         this.codificador = codificador;
         this.auditor = auditor;
         this.reloj = reloj;
+        this.reglas = reglas;
     }
 
     /**
@@ -484,7 +488,7 @@ public class GestionarEmpleadosService {
 
     /** Las ausencias son días del local, como en MozoDeTurnoAdapter. */
     private LocalDate hoy() {
-        return DiaDelLocal.hoy(reloj);
+        return DiaDelLocal.hoy(reloj, reglas);
     }
 
     /** El Gerente/Dueño no tiene local fijo y no gestiona empleados. */

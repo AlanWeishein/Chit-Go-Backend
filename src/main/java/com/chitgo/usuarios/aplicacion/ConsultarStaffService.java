@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.usuarios.aplicacion.dto.StaffDto;
@@ -24,11 +25,14 @@ public class ConsultarStaffService {
     private final LocalRepository locales;
     private final UsuarioRepository usuarios;
     private final Reloj reloj;
+    private final ReglasDelNegocio reglas;
 
-    public ConsultarStaffService(LocalRepository locales, UsuarioRepository usuarios, Reloj reloj) {
+    public ConsultarStaffService(LocalRepository locales, UsuarioRepository usuarios, Reloj reloj,
+                                 ReglasDelNegocio reglas) {
         this.locales = locales;
         this.usuarios = usuarios;
         this.reloj = reloj;
+        this.reglas = reglas;
     }
 
     /**
@@ -41,7 +45,7 @@ public class ConsultarStaffService {
         Local local = locales.buscarPorTokenStaff(tokenStaff)
                 .orElseThrow(() -> new NoEncontradoException(QR_INVALIDO));
         List<UsuarioDeStaffDto> lista = usuarios
-                .listarParaElLogin(local.getId(), Rol.CODIGOS_CON_PIN, DiaDelLocal.hoy(reloj)).stream()
+                .listarParaElLogin(local.getId(), Rol.CODIGOS_CON_PIN, DiaDelLocal.hoy(reloj, reglas)).stream()
                 .map(u -> new UsuarioDeStaffDto(u.getId(), u.getNombre()))
                 .toList();
         return new StaffDto(local.getNombre(), lista);

@@ -2,26 +2,26 @@ package com.chitgo.usuarios.infraestructura.persistencia;
 
 import java.time.Instant;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
 
 import org.springframework.stereotype.Repository;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.usuarios.dominio.DiaSemana;
 import com.chitgo.usuarios.dominio.puertos.TurnosQueEmpiezan;
 
+/** Los turnos son horas de pared del local ({@code chitgo.reglas.zona-horaria}), no UTC. */
 @Repository
 class TurnosQueEmpiezanAdapter implements TurnosQueEmpiezan {
 
-    /** Los turnos son horas de pared del local, no UTC. */
-    private static final ZoneId ZONA = ZoneId.of("America/Argentina/Buenos_Aires");
-
     private final EmpleadoJpaRepository jpa;
+    private final ReglasDelNegocio reglas;
 
-    TurnosQueEmpiezanAdapter(EmpleadoJpaRepository jpa) {
+    TurnosQueEmpiezanAdapter(EmpleadoJpaRepository jpa, ReglasDelNegocio reglas) {
         this.jpa = jpa;
+        this.reglas = reglas;
     }
 
     /**
@@ -30,7 +30,7 @@ class TurnosQueEmpiezanAdapter implements TurnosQueEmpiezan {
      */
     @Override
     public Set<Long> localesConTurnoQueEmpieza(Instant ahora) {
-        ZonedDateTime local = ahora.atZone(ZONA);
+        ZonedDateTime local = ahora.atZone(reglas.zonaHoraria());
         LocalTime desde = local.toLocalTime().truncatedTo(ChronoUnit.MINUTES);
         DiaSemana dia = DiaSemana.values()[local.getDayOfWeek().getValue() - 1];
         return jpa.localesConTurnoQueEmpieza(dia, desde, desde.plusSeconds(59));

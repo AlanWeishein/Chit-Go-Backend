@@ -42,3 +42,20 @@ chitgo:
       # La tarea que manda ALERTA_DEMORA a Caja cada 5 segundos (HU-08). Los tests la apagan en
       # src/test/resources/config/application.yml.
       habilitada: true
+  reglas:
+    # Los números del negocio (punto 14 del 10/11). Los lee ReglasDelNegocio: si falta alguno, o toda la
+    # sección, vale el mismo valor de acá. Un cero, un negativo o una zona que no existe no deja arrancar.
+    # El T de inactividad de cada local (RNF-14) no está acá: lo configura el Admin y vive en la base.
+    # RF-16: un pedido sin resolverse pasa a demorado después de esto (a los 180 s todavía no, a los 181 sí).
+    # En segundos enteros.
+    demora-del-pedido: 180s
+    # La sesión de Caja se corta a la hora (09/10), sin importar el T del local. El front avisa 5 minutos antes.
+    sesion-de-caja: 1h
+    # El Gerente/Dueño no tiene local, así que tampoco tiene el T que configura el Admin.
+    sesion-sin-local: 10m
+    # RF-13: cada cuánto el mozo vuelve a entrar con usuario y contraseña en su celular.
+    vigencia-del-dispositivo: 7d
+    # RNF-07: intentos fallidos seguidos para quedar bloqueado, hasta que el Admin blanquea el PIN.
+    intentos-para-bloquear: 5
+    # La del local: los turnos y las ausencias son horas y días de pared, no UTC.
+    zona-horaria: America/Argentina/Buenos_Aires

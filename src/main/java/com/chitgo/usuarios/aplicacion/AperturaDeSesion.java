@@ -5,6 +5,7 @@ import java.time.Instant;
 
 import org.springframework.stereotype.Component;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.usuarios.aplicacion.dto.SesionDto;
 import com.chitgo.usuarios.aplicacion.dto.SesionDto.LocalDeSesionDto;
 import com.chitgo.usuarios.dominio.DatosDeSesion;
@@ -19,21 +20,17 @@ import com.chitgo.usuarios.dominio.puertos.EmisorDeTokens;
 @Component
 class AperturaDeSesion {
 
-    /** Caja se corta a la hora (09/10), con el aviso a los 55 minutos en el front. No la configura el Admin. */
-    static final Duration DURACION_CAJA = Duration.ofHours(1);
-
-    /** El Gerente/Dueño no tiene local, y por lo tanto no tiene el T que configura el Admin. */
-    static final Duration DURACION_SIN_LOCAL = Duration.ofMinutes(10);
-
     private final EmisorDeTokens emisor;
+    private final ReglasDelNegocio reglas;
 
-    AperturaDeSesion(EmisorDeTokens emisor) {
+    AperturaDeSesion(EmisorDeTokens emisor, ReglasDelNegocio reglas) {
         this.emisor = emisor;
+        this.reglas = reglas;
     }
 
     /** @param local NULL para el Gerente/Dueño */
     ResultadoDeIngreso abrir(Usuario usuario, Local local) {
-        Duration duracion = duracionPara(usuario, local);
+        Duration duracion = duracionPara(usuario, local, reglas);
         Long localId = local != null ? local.getId() : null;
         DatosDeSesion datos = new DatosDeSesion(usuario.getId(), usuario.getRol().getCodigo(), localId,
                 usuario.isDebeCambiarCredencial());
@@ -47,11 +44,15 @@ class AperturaDeSesion {
         return new ResultadoDeIngreso(token, duracion, sesion);
     }
 
-    /** El T según el rol: Caja, una hora; el resto, el del local (10 por defecto); el Gerente/Dueño, 10. */
-    static Duration duracionPara(Usuario usuario, Local local) {
+    /**
+     * El T según el rol. Caja, {@code sesion-de-caja} (una hora por defecto, 09/10), que no la configura el Admin.
+     * El resto, el del local (10 por defecto, en la base). El Gerente/Dueño no tiene local, y por lo tanto no
+     * tiene el T que configura el Admin: {@code sesion-sin-local} (10 minutos por defecto).
+     */
+    static Duration duracionPara(Usuario usuario, Local local, ReglasDelNegocio reglas) {
         if (usuario.getRol().esCaja()) {
-            return DURACION_CAJA;
+            return reglas.sesionDeCaja();
         }
-        return local != null ? Duration.ofMinutes(local.getMinutosInactividadSesion()) : DURACION_SIN_LOCAL;
+        return local != null ? Duration.ofMinutes(local.getMinutosInactividadSesion()) : reglas.sesionSinLocal();
     }
 }

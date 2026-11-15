@@ -4,6 +4,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.pedidos.aplicacion.MesasSinMozoService;
 
 /**
@@ -16,8 +17,12 @@ import com.chitgo.pedidos.aplicacion.MesasSinMozoService;
 @ConditionalOnProperty(name = "chitgo.alertas.mesa-sin-mozo.habilitada", havingValue = "true", matchIfMissing = true)
 public class AlertaDeMesaSinMozoProgramada {
 
-    /** La de MozoDeTurnoAdapter: el turno empieza a una hora de pared del local. */
-    static final String ZONA = "America/Argentina/Buenos_Aires";
+    /**
+     * La de MozoDeTurnoAdapter: el turno empieza a una hora de pared del local. El {@code zone} tiene que ser una
+     * constante, así que se lee la propiedad con un placeholder, que Spring resuelve al agendar la tarea, y el valor
+     * por defecto es el mismo de ReglasDelNegocio.
+     */
+    static final String ZONA = "${chitgo.reglas.zona-horaria:" + ReglasDelNegocio.ZONA_POR_DEFECTO + "}";
 
     private final MesasSinMozoService mesasSinMozo;
 

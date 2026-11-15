@@ -32,8 +32,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.RelojDePrueba;
-import com.chitgo.usuarios.dominio.Usuario;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeDispositivo;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeSesion;
 
@@ -81,6 +81,9 @@ class BlanqueoYAusenciaEnElLoginTest {
 
     @Autowired
     private RelojDePrueba reloj;
+
+    @Autowired
+    private ReglasDelNegocio reglas;
 
     private List<Map<String, Object>> hashesDeLaSeed;
     private Long ultimaAuditoriaAntes;
@@ -203,7 +206,7 @@ class BlanqueoYAusenciaEnElLoginTest {
             blanquear(empleadoDe("Juan"), "{\"pin\": \"" + pin + "\"}").andExpect(status().isBadRequest());
         }
 
-        assertThat(intentos(juan)).isEqualTo(Usuario.INTENTOS_PARA_BLOQUEAR);
+        assertThat(intentos(juan)).isEqualTo(reglas.intentosParaBloquear());
         assertThat(auditoriasNuevas()).isZero();
     }
 
@@ -253,7 +256,7 @@ class BlanqueoYAusenciaEnElLoginTest {
         ausencia("Carla", hoy(), null);
 
         pin(carla, "2468", null).andExpect(status().isNotFound());
-        assertThat(intentos(carla)).isEqualTo(Usuario.INTENTOS_PARA_BLOQUEAR);
+        assertThat(intentos(carla)).isEqualTo(reglas.intentosParaBloquear());
     }
 
     @Test
@@ -422,7 +425,7 @@ class BlanqueoYAusenciaEnElLoginTest {
 
     private void bloquear(Long usuarioId) {
         jdbc.update("UPDATE usuario SET intentos_fallidos = ?, bloqueado_hasta = '2038-01-01 00:00:00' WHERE id = ?",
-                Usuario.INTENTOS_PARA_BLOQUEAR, usuarioId);
+                reglas.intentosParaBloquear(), usuarioId);
     }
 
     private int intentos(Long usuarioId) {

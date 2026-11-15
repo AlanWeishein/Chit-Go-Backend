@@ -7,6 +7,7 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.usuarios.dominio.Local;
 import com.chitgo.usuarios.dominio.Rol;
 import com.chitgo.usuarios.dominio.Usuario;
@@ -23,13 +24,13 @@ class AperturaDeSesionTest {
 
     @Test
     void cajaTieneUnaHoraAunqueElLocalDigaOtraCosa() {
-        assertThat(AperturaDeSesion.duracionPara(con("CAJA"), laEsquina)).isEqualTo(Duration.ofHours(1));
+        assertThat(AperturaDeSesion.duracionPara(con("CAJA"), laEsquina, ReglasDePrueba.DE_HOY)).isEqualTo(Duration.ofHours(1));
     }
 
     @Test
     void mozoCocinaYAdminUsanElTDelLocal() {
         for (String rol : new String[] {"MOZO", "COCINA", "ADMIN"}) {
-            assertThat(AperturaDeSesion.duracionPara(con(rol), laEsquina)).isEqualTo(Duration.ofMinutes(20));
+            assertThat(AperturaDeSesion.duracionPara(con(rol), laEsquina, ReglasDePrueba.DE_HOY)).isEqualTo(Duration.ofMinutes(20));
         }
     }
 
@@ -37,12 +38,12 @@ class AperturaDeSesionTest {
     void elTDelLocalEsDiezPorDefecto() {
         Local nuevo = new Local(1L, "Nuevo", "Calle 2", "otro-token");
 
-        assertThat(AperturaDeSesion.duracionPara(con("MOZO"), nuevo)).isEqualTo(Duration.ofMinutes(10));
+        assertThat(AperturaDeSesion.duracionPara(con("MOZO"), nuevo, ReglasDePrueba.DE_HOY)).isEqualTo(Duration.ofMinutes(10));
     }
 
     @Test
     void elGerenteDuenoTieneDiezMinutos() {
-        assertThat(AperturaDeSesion.duracionPara(con("GERENTE_DUENO"), null)).isEqualTo(Duration.ofMinutes(10));
+        assertThat(AperturaDeSesion.duracionPara(con("GERENTE_DUENO"), null, ReglasDePrueba.DE_HOY)).isEqualTo(Duration.ofMinutes(10));
     }
 
     private static Usuario con(String rol) {

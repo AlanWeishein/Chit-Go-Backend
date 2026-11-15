@@ -22,6 +22,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.RelojDePrueba;
 import com.chitgo.usuarios.aplicacion.dto.SesionDto;
@@ -81,7 +82,7 @@ class LoginConAusenciaYContrasenaProvisoriaTest {
     void la_lista_pide_a_los_que_no_tienen_ausencia_con_el_dia_del_local() {
         when(usuarios.listarParaElLogin(eq(1L), any(), eq(HOY_EN_EL_LOCAL))).thenReturn(List.of(carla));
 
-        StaffDto staff = new ConsultarStaffService(locales, usuarios, reloj).consultar(TOKEN);
+        StaffDto staff = new ConsultarStaffService(locales, usuarios, reloj, ReglasDePrueba.DE_HOY).consultar(TOKEN);
 
         assertEquals(List.of("Carla"), staff.usuarios().stream().map(StaffDto.UsuarioDeStaffDto::nombre).toList());
         verify(usuarios).listarParaElLogin(1L, Rol.CODIGOS_CON_PIN, HOY_EN_EL_LOCAL);
@@ -105,8 +106,8 @@ class LoginConAusenciaYContrasenaProvisoriaTest {
 
     @Test
     void con_una_ausencia_vigente_el_bloqueado_tambien_ve_el_404_y_no_el_423() {
-        for (int i = 0; i < Usuario.INTENTOS_PARA_BLOQUEAR; i++) {
-            carla.registrarIntentoFallido();
+        for (int i = 0; i < ReglasDePrueba.DE_HOY.intentosParaBloquear(); i++) {
+            carla.registrarIntentoFallido(ReglasDePrueba.DE_HOY.intentosParaBloquear());
         }
         when(usuarios.tieneAusenciaVigente(11L, 1L, HOY_EN_EL_LOCAL)).thenReturn(true);
 
@@ -133,7 +134,7 @@ class LoginConAusenciaYContrasenaProvisoriaTest {
         when(codificador.hashear(anyString())).thenReturn("relleno");
         EmisorDeHabilitaciones emisor = mock(EmisorDeHabilitaciones.class);
         HabilitarDispositivoService servicio = new HabilitarDispositivoService(locales, usuarios, codificador, emisor,
-                reloj);
+                reloj, ReglasDePrueba.DE_HOY);
 
         assertThrows(UsuarioOContrasenaIncorrectosException.class,
                 () -> servicio.habilitar(TOKEN, "juan", "Chitgo2026!"));
@@ -201,11 +202,11 @@ class LoginConAusenciaYContrasenaProvisoriaTest {
         when(emisor.emitir(any(DatosDeSesion.class), any(Duration.class))).thenReturn("jwt");
         when(emisor.leer("jwt")).thenReturn(new TokenLeido(null, AHORA.plusSeconds(600), AHORA));
 
-        SesionDto sesion = new AperturaDeSesion(emisor).abrir(pedro, laEsquina).sesion();
+        SesionDto sesion = new AperturaDeSesion(emisor, ReglasDePrueba.DE_HOY).abrir(pedro, laEsquina).sesion();
 
         assertTrue(sesion.debeCambiarCredencial());
         assertTrue(sesion.contrasenaProvisoria());
-        assertFalse(new AperturaDeSesion(emisor).abrir(juan, laEsquina).sesion().contrasenaProvisoria());
+        assertFalse(new AperturaDeSesion(emisor, ReglasDePrueba.DE_HOY).abrir(juan, laEsquina).sesion().contrasenaProvisoria());
     }
 
     @Test
@@ -234,7 +235,7 @@ class LoginConAusenciaYContrasenaProvisoriaTest {
 
     private IngresarConPinService ingresarConPin(AperturaDeSesion apertura) {
         return new IngresarConPinService(locales, usuarios, codificador, mock(EmisorDeHabilitaciones.class), apertura,
-                reloj);
+                reloj, ReglasDePrueba.DE_HOY);
     }
 
     private ElegirCredencialService elegirCredencial(AperturaDeSesion apertura) {

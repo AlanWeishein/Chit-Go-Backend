@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.usuarios.aplicacion.dto.DispositivoDto;
@@ -31,17 +32,19 @@ public class HabilitarDispositivoService {
     private final CodificadorDeClaves codificador;
     private final EmisorDeHabilitaciones emisor;
     private final Reloj reloj;
+    private final ReglasDelNegocio reglas;
 
     /** Como en el login con email: para que un usuario que no existe tarde lo mismo que uno que sí. */
     private final String hashDeRelleno;
 
     HabilitarDispositivoService(LocalRepository locales, UsuarioRepository usuarios, CodificadorDeClaves codificador,
-            EmisorDeHabilitaciones emisor, Reloj reloj) {
+            EmisorDeHabilitaciones emisor, Reloj reloj, ReglasDelNegocio reglas) {
         this.locales = locales;
         this.usuarios = usuarios;
         this.codificador = codificador;
         this.emisor = emisor;
         this.reloj = reloj;
+        this.reglas = reglas;
         this.hashDeRelleno = codificador.hashear(UUID.randomUUID().toString());
     }
 
@@ -65,7 +68,7 @@ public class HabilitarDispositivoService {
         Usuario usuario = usuarios.buscarPorNombreDeUsuarioParaIngreso(local.getId(), nombreUsuario.strip())
                 .filter(Usuario::isActivo)
                 .filter(u -> u.getRol().esMozo())
-                .filter(u -> !usuarios.tieneAusenciaVigente(u.getId(), local.getId(), DiaDelLocal.hoy(reloj)))
+                .filter(u -> !usuarios.tieneAusenciaVigente(u.getId(), local.getId(), DiaDelLocal.hoy(reloj, reglas)))
                 .orElse(null);
         if (usuario == null) {
             codificador.verificar(password, hashDeRelleno);
@@ -83,7 +86,7 @@ public class HabilitarDispositivoService {
             throw new UsuarioOContrasenaIncorrectosException();
         }
         if (!coincide) {
-            usuario.registrarIntentoFallido();
+            usuario.registrarIntentoFallido(reglas.intentosParaBloquear());
             throw new UsuarioOContrasenaIncorrectosException();
         }
         usuario.registrarIngreso();

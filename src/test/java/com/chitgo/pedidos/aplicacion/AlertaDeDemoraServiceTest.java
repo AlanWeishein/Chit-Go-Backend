@@ -19,6 +19,7 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.compartido.dominio.RelojDePrueba;
 import com.chitgo.pedidos.dominio.EventoTiempoReal;
 import com.chitgo.pedidos.dominio.TipoEvento;
@@ -46,7 +47,7 @@ class AlertaDeDemoraServiceTest {
                 .toList();
     };
     private final PublicadorDeEventos eventos = mock(PublicadorDeEventos.class);
-    private final AlertaDeDemoraService servicio = new AlertaDeDemoraService(puerto, eventos, reloj);
+    private final AlertaDeDemoraService servicio = new AlertaDeDemoraService(puerto, eventos, reloj, ReglasDePrueba.DE_HOY);
 
     private record Cargado(PedidoPendiente pendiente, Instant enviadoEn) {
     }
