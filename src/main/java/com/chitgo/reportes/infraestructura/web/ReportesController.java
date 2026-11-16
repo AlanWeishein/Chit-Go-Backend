@@ -11,7 +11,7 @@ import com.chitgo.reportes.dominio.puertos.ReportesRepository.PlatoPedido;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
 @RestController
-@RequestMapping({"/api/v1/admin/reportes", "/api/v1/gerente/reportes"})
+@RequestMapping("/api/v1/admin/reportes")
 @PreAuthorize("hasAuthority('reporte.ver')")
 public class ReportesController {
     private final ConsultarReportesService reportes;
