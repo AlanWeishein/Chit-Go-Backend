@@ -10,7 +10,7 @@ Referencia de coordinación: ST-22 de Ezequiel (14/11); su implementación de HU
 | Reportes y consulta de auditoría (HU-15) | Implementada y validada con MySQL |
 | Pantalla del salón (HU-17) | Implementada y validada con MySQL y autorización STOMP |
 | Carga: RNF-01, RNF-03 y RNF-06 | Ensayo local ejecutado; pendiente red/front del local |
-| Integración final y errores (compartida) | Pendiente |
+| Integración final y errores (compartida) | Backend validado: 887 pruebas y empaquetado; recorrido con front pendiente |
 
 ## HU-13: contrato para P-15 y P-38
 
@@ -43,8 +43,9 @@ Cambios e historial se guardan en la misma transacción; repetir el estado sin c
 
 Se unifican `PaginaDe` y `PaginaDto` en `compartido`, sin cambiar el JSON de empleados: page desde 0,
 size por defecto 20, máximo 100, 400 fuera de rango. `Mesa.id` y `Mesa.localId` se mantienen; la lectura
-de usuarios además excluye mesas dadas de baja. Queda previsto documentar las 11 rutas de empleados
-en una colección Postman junto con el sprint al hacer la integración final.
+de usuarios además excluye mesas dadas de baja. Las 11 rutas de empleados están incluidas en la
+[colección Postman](postman/chit-go-sprint-3.postman_collection.json), con uso explicado en
+[postman/README.md](postman/README.md). La colección incluye también las nuevas rutas del sprint.
 
 Validación HU-13: pruebas HTTP con MySQL real para gestión, permisos, CSRF, aislamiento, cuenta abierta,
 baja e historial; lectura del PNG con un decoder QR; regresión de gestión y persistencia de empleados.
@@ -120,3 +121,26 @@ sin pérdida ni mezcla de cuentas. p95 servidor → recepción en KDS: **16,44 m
 **9,52 ms** sostenido, por debajo de 2000 ms. El ensayo usa HTTP/STOMP reales y MySQL de Docker,
 con fixtures aislados que se eliminan al terminar. Evidencia: [resultados-carga-sprint3.json](resultados-carga-sprint3.json).
 Esto no verifica la red Wi-Fi/TV ni el render del front; esa comprobación requiere el local.
+
+## Integración y verificación final
+
+`FlujoSprint3Test` recorre por HTTP: alta de mesa → asignación a mozo por HU-14 → escaneo → envío →
+aprobación → preparación → listo en pantalla → servido y retiro de pantalla → solicitud de cuenta →
+cierre/ticket → venta y auditoría consultables → baja lógica. Cada request confirma su transacción;
+al finalizar elimina solo sus fixtures. El resto de las pruebas nuevas usan transacciones revertidas
+cuando corresponde. `CsrfReal` obtiene una cookie real del GET inicial y evita reemplazar el repositorio
+de CSRF compartido con las pruebas de login.
+
+Verificación del 16/11/2026:
+
+```powershell
+mvn -Ddebug=false verify
+```
+
+**887 pruebas en 88 clases: 0 fallos, 0 errores, 0 omitidas**, y JAR ejecutable empaquetado.
+La prueba de carga se ejecutó aparte con `mvn -Pcarga test`: 1 prueba aprobada y evidencia conservada
+en el JSON de resultados. La colección Postman pasó validación JSON y de cuerpos con variables;
+su ejecución manual en Postman no forma parte de esta evidencia.
+
+Pendientes externos: recorrido con el front/TV y medición en la red del local. Los puntos abiertos de
+HU-13 quedaron documentados arriba como decisiones de implementación para revisión del grupo.

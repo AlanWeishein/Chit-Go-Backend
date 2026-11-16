@@ -1,5 +1,6 @@
 package com.chitgo.reportes.infraestructura.web;
 
+import static com.chitgo.pruebas.CsrfReal.csrfReal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -147,7 +148,7 @@ class ReportesYAuditoriaTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.contenido").isEmpty());
         mvc.perform(get("/api/v1/gerente/auditoria?localId=" + otroLocal).with(dueno("auditoria.ver")))
                 .andExpect(status().isNotFound());
-        mvc.perform(delete("/api/v1/admin/auditoria").with(admin("auditoria.ver")).with(csrf()))
+        mvc.perform(delete("/api/v1/admin/auditoria").with(admin("auditoria.ver")).with(csrfReal(mvc)))
                 .andExpect(status().isMethodNotAllowed());
     }
 

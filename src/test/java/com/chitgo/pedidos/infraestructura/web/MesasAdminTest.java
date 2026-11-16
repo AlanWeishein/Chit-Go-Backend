@@ -1,5 +1,6 @@
 package com.chitgo.pedidos.infraestructura.web;
 
+import static com.chitgo.pruebas.CsrfReal.csrfReal;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -40,10 +41,18 @@ class MesasAdminTest {
     }
 
     private Long crear() throws Exception {
-        String respuesta = mvc.perform(post(RUTA).with(admin()).with(csrf()).contentType("application/json")
+        String respuesta = mvc.perform(post(RUTA).with(admin()).with(csrfReal(mvc)).contentType("application/json")
                 .content("{\"numero\":\"Sprint-3\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         return json.readTree(respuesta).get("id").asLong();
+    }
+
+    @Test
+    void numeroDuplicadoEnElLocalResponde409() throws Exception {
+        crear();
+        mvc.perform(post(RUTA).with(admin()).with(csrfReal(mvc)).contentType("application/json")
+                .content("{\"numero\":\"Sprint-3\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.detail").value("Ya existe la mesa Sprint-3"));
     }
 
     @Test
@@ -51,20 +60,20 @@ class MesasAdminTest {
         Long id = crear();
         String token = jdbc.queryForObject("SELECT token_qr FROM mesa WHERE id = ?", String.class, id);
         UUID.fromString(token);
-        mvc.perform(put(RUTA + "/" + id).with(admin()).with(csrf()).contentType("application/json")
+        mvc.perform(put(RUTA + "/" + id).with(admin()).with(csrfReal(mvc)).contentType("application/json")
                 .content("{\"numero\":\"Sprint-3-b\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.tokenQr").value(token));
         byte[] qr = mvc.perform(get(RUTA + "/" + id + "/qr").with(admin()))
                 .andExpect(status().isOk()).andExpect(content().contentType("image/png"))
                 .andReturn().getResponse().getContentAsByteArray();
         assertThat(qr).startsWith((byte) 0x89, (byte) 0x50, (byte) 0x4e, (byte) 0x47);
-        mvc.perform(patch(RUTA + "/" + id + "/inhabilitada").with(admin()).with(csrf())
+        mvc.perform(patch(RUTA + "/" + id + "/inhabilitada").with(admin()).with(csrfReal(mvc))
                 .contentType("application/json").content("{\"inhabilitada\":true,\"motivo\":\"Rota\"}"))
                 .andExpect(status().isOk());
-        mvc.perform(post("/api/v1/public/mesas/" + token + "/sesiones").with(csrf()))
+        mvc.perform(post("/api/v1/public/mesas/" + token + "/sesiones").with(csrfReal(mvc)))
                 .andExpect(status().isConflict());
-        mvc.perform(delete(RUTA + "/" + id).with(admin()).with(csrf())).andExpect(status().isNoContent());
-        mvc.perform(delete(RUTA + "/" + id).with(admin()).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(delete(RUTA + "/" + id).with(admin()).with(csrfReal(mvc))).andExpect(status().isNoContent());
+        mvc.perform(delete(RUTA + "/" + id).with(admin()).with(csrfReal(mvc))).andExpect(status().isNoContent());
         mvc.perform(get("/api/v1/public/mesas/" + token)).andExpect(status().isNotFound());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM registro_auditoria WHERE entidad='MESA' AND entidad_id=?",
                 Integer.class, id)).isEqualTo(4);
@@ -75,9 +84,9 @@ class MesasAdminTest {
     void cuentaAbiertaImpideInhabilitarOBaja() throws Exception {
         Long id = crear();
         String token = jdbc.queryForObject("SELECT token_qr FROM mesa WHERE id=?", String.class, id);
-        mvc.perform(post("/api/v1/public/mesas/" + token + "/sesiones").with(csrf())).andExpect(status().isCreated());
-        mvc.perform(delete(RUTA + "/" + id).with(admin()).with(csrf())).andExpect(status().isConflict());
-        mvc.perform(patch(RUTA + "/" + id + "/inhabilitada").with(admin()).with(csrf())
+        mvc.perform(post("/api/v1/public/mesas/" + token + "/sesiones").with(csrfReal(mvc))).andExpect(status().isCreated());
+        mvc.perform(delete(RUTA + "/" + id).with(admin()).with(csrfReal(mvc))).andExpect(status().isConflict());
+        mvc.perform(patch(RUTA + "/" + id + "/inhabilitada").with(admin()).with(csrfReal(mvc))
                 .contentType("application/json").content("{\"inhabilitada\":true,\"motivo\":\"Rota\"}"))
                 .andExpect(status().isConflict());
     }
