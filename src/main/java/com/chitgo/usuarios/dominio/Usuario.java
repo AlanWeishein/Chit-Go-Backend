@@ -237,6 +237,16 @@ public class Usuario {
         return usuario;
     }
 
+    /**
+     * Alta del Gerente/Dueño con el script del local (HU-16): no tiene local, porque el local lo apunta a él, y la
+     * contraseña la puso quien corrió el script, así que la cambia al entrar.
+     */
+    public static Usuario nuevoGerente(Rol rol, String nombre, String email, String hashPassword) {
+        Usuario usuario = new Usuario(null, rol, nombre, null, email, hashPassword, null);
+        usuario.debeCambiarCredencial = true;
+        return usuario;
+    }
+
     /** Lo vuelve a dar de alta. Devuelve false si ya estaba activo, como {@link #darDeBaja()}. */
     public boolean reactivar() {
         if (activo) {

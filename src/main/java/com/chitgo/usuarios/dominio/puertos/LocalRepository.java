@@ -18,4 +18,7 @@ public interface LocalRepository {
      * tiene varios, devuelve el de id más bajo, y eso hay que revisarlo en el MVP 2.
      */
     Optional<Local> buscarPorPropietario(Long usuarioId);
+
+    /** El alta del local con el script (HU-16). Con flush, así el id y cualquier error salen acá. */
+    Local guardar(Local local);
 }

@@ -35,4 +35,9 @@ class LocalRepositoryAdapter implements LocalRepository {
     public Optional<Local> buscarPorPropietario(Long usuarioId) {
         return jpa.findFirstByPropietarioUsuarioIdOrderByIdAsc(usuarioId);
     }
+
+    @Override
+    public Local guardar(Local local) {
+        return jpa.saveAndFlush(local);
+    }
 }
