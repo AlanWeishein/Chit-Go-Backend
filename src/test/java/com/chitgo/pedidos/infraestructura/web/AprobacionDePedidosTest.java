@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -146,6 +147,11 @@ class AprobacionDePedidosTest {
         @Override
         public List<Pedido> listarDeLaCuenta(Long cuentaId) {
             return real.listarDeLaCuenta(cuentaId);
+        }
+
+        @Override
+        public List<Pedido> listarDeLasCuentas(Collection<Long> cuentaIds) {
+            return real.listarDeLasCuentas(cuentaIds);
         }
 
         @Override

@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Duration;
 
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +50,12 @@ class AutenticacionControllerTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    /** El logout deja el "válido desde" de Juan (ST-23, tarea 3): se vuelve a la seed. */
+    @AfterEach
+    void dejarLaSeedComoEstaba() {
+        jdbc.update("UPDATE usuario SET sesion_valida_desde = NULL");
+    }
 
     @Test
     void elPingEsPublico() throws Exception {

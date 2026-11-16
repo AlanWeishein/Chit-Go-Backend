@@ -170,7 +170,6 @@ public class Pedido {
     }
 
     // ----- máquina de estados: las reglas viven acá -----
-    // Servir lo suma quien haga HU-05, en esta misma clase.
 
     /** Caja aprueba (HU-07): solo un pedido pendiente. Queda quién lo resolvió y a qué hora. */
     public void aprobar(Long usuarioId, Instant ahora) {
@@ -245,6 +244,29 @@ public class Pedido {
         listoEn = ahora;
     }
 
+    /** HU-05: solo se sirve un pedido que Cocina dejó listo. */
+    public void servir(Long usuarioId, Instant ahora) {
+        if (estado != EstadoPedido.LISTO) {
+            throw new ReglaDeNegocioException("Solo se puede servir un pedido listo");
+        }
+        if (usuarioId == null || ahora == null) {
+            throw new IllegalArgumentException("Faltan el mozo o la hora del servido");
+        }
+        estado = EstadoPedido.SERVIDO;
+        servidoPorUsuarioId = usuarioId;
+        servidoEn = ahora;
+    }
+
+    /** HU-08: la prioridad solo cambia mientras el pedido espera en la cola de Cocina. */
+    public boolean cambiarPrioridad(boolean prioridad) {
+        if (estado != EstadoPedido.APROBADO) {
+            throw new ReglaDeNegocioException("Solo se puede cambiar la prioridad de un pedido en la cola de cocina");
+        }
+        boolean cambio = prioridadManual != prioridad;
+        prioridadManual = prioridad;
+        return cambio;
+    }
+
     /** Qué le dice al cliente si ya no puede cancelar, según el estado en que está el pedido. */
     public String mensajeNoCancelable() {
         return switch (estado) {
@@ -270,6 +292,19 @@ public class Pedido {
     /** Qué le dice a Caja si ya no puede aprobarlo ni rechazarlo: lo canceló el cliente u otra caja lo resolvió. */
     public String mensajeNoResoluble() {
         return estado == EstadoPedido.CANCELADO ? "El pedido ya fue cancelado" : "El pedido ya fue resuelto";
+    }
+
+    /**
+     * Sin servir es lo que no está Servido, Rechazado ni Cancelado: lo que el cierre de la cuenta cancela (20/10).
+     * Coincide con los estados desde los que cancela CIERRE_DE_CUENTA, y por eso se apoya en ellos.
+     */
+    public boolean estaSinServir() {
+        return OrigenDeCancelacion.CIERRE_DE_CUENTA.permite(estado);
+    }
+
+    /** Suma al total de la cuenta todo lo que no quedó Rechazado ni Cancelado (CP-22-02). */
+    public boolean cuentaEnElTotal() {
+        return estado != EstadoPedido.RECHAZADO && estado != EstadoPedido.CANCELADO;
     }
 
     /** Suma de cantidad por precio unitario de cada ítem (el precio del momento del pedido). */

@@ -18,7 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.chitgo.usuarios.aplicacion.RenovarSesionService;
 import com.chitgo.usuarios.aplicacion.ResultadoDeIngreso;
 import com.chitgo.usuarios.dominio.TokenInvalidoException;
-import com.chitgo.usuarios.dominio.UsuarioAutenticado;
+import com.chitgo.usuarios.dominio.TokenLeido;
 
 /**
  * Lee el JWT de la cookie y, si es válido, deja al usuario autenticado para esta request. Si no hay cookie
@@ -52,26 +52,32 @@ public class FiltroDeSesion extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
+    /**
+     * El token de antes del último logout no sirve (CP-13-01). En las rutas que renuevan lo compara
+     * RenovarSesionService con el usuario que ya carga; en las demás, AutenticadorPorToken, con una consulta.
+     */
     private void autenticar(String token, HttpServletRequest request, HttpServletResponse response) {
         Authentication autenticacion;
         try {
-            autenticacion = autenticador.autenticar(token);
+            if (rutasQueNoRenuevan.matches(request)) {
+                autenticacion = autenticador.autenticar(token);
+            } else {
+                TokenLeido leido = autenticador.leer(token);
+                Optional<ResultadoDeIngreso> renovada =
+                        renovacion.renovar(leido.datos().usuarioId(), leido.emitidoEn());
+                if (renovada.isEmpty()) {
+                    // Dado de baja o token de antes del logout: queda sin usuario y la ruta da 401, aunque el
+                    // token todavía no venció.
+                    return;
+                }
+                String nuevo = renovada.get().token();
+                response.addHeader(HttpHeaders.SET_COOKIE,
+                        cookieDeSesion.crear(nuevo, renovada.get().duracion()).toString());
+                autenticacion = autenticador.autenticarRecienEmitido(nuevo);
+            }
         } catch (TokenInvalidoException e) {
             // Sin usuario: si la ruta pide sesión, el entry point responde 401.
             return;
-        }
-
-        if (!rutasQueNoRenuevan.matches(request)) {
-            UsuarioAutenticado usuario = (UsuarioAutenticado) autenticacion.getPrincipal();
-            Optional<ResultadoDeIngreso> renovada = renovacion.renovar(usuario.usuarioId());
-            if (renovada.isEmpty()) {
-                // Dado de baja: queda sin usuario y la ruta da 401, aunque el token todavía no venció.
-                return;
-            }
-            String nuevo = renovada.get().token();
-            response.addHeader(HttpHeaders.SET_COOKIE,
-                    cookieDeSesion.crear(nuevo, renovada.get().duracion()).toString());
-            autenticacion = autenticador.autenticar(nuevo);
         }
 
         SecurityContext contexto = contextos.createEmptyContext();
