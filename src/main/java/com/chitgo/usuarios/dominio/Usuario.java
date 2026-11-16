@@ -227,6 +227,48 @@ public class Usuario {
         return true;
     }
 
+    /**
+     * Alta de un Admin (HU-16, CP-31-01): la contraseña la puso el Gerente/Dueño, así que es provisoria y la cambia
+     * al entrar. La marca de contraseña provisoria es solo del mozo y queda en false.
+     */
+    public static Usuario nuevoAdmin(Long localId, Rol rol, String nombre, String email, String hashPassword) {
+        Usuario usuario = new Usuario(localId, rol, nombre, null, email, hashPassword, null);
+        usuario.debeCambiarCredencial = true;
+        return usuario;
+    }
+
+    /**
+     * Alta del Gerente/Dueño con el script del local (HU-16): no tiene local, porque el local lo apunta a él, y la
+     * contraseña la puso quien corrió el script, así que la cambia al entrar.
+     */
+    public static Usuario nuevoGerente(Rol rol, String nombre, String email, String hashPassword) {
+        Usuario usuario = new Usuario(null, rol, nombre, null, email, hashPassword, null);
+        usuario.debeCambiarCredencial = true;
+        return usuario;
+    }
+
+    /** Lo vuelve a dar de alta. Devuelve false si ya estaba activo, como {@link #darDeBaja()}. */
+    public boolean reactivar() {
+        if (activo) {
+            return false;
+        }
+        activo = true;
+        return true;
+    }
+
+    /**
+     * El Gerente/Dueño levanta el bloqueo de un Admin (HU-16, RNF-07): los intentos vuelven a 0. Devuelve false si
+     * no estaba bloqueado, y entonces no toca nada, tampoco los intentos que lleve.
+     */
+    public boolean desbloquear(Instant ahora) {
+        if (!estaBloqueado(ahora)) {
+            return false;
+        }
+        intentosFallidos = 0;
+        bloqueadoHasta = null;
+        return true;
+    }
+
     /** Entró con la credencial correcta: los intentos vuelven a 0. */
     public void registrarIngreso() {
         intentosFallidos = 0;

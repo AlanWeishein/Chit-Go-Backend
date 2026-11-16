@@ -40,4 +40,22 @@ public interface UsuarioRepository {
 
     /** Si el usuario tiene, como empleado de ese local, una ausencia que cubre {@code hoy}. */
     boolean tieneAusenciaVigente(Long usuarioId, Long localId, LocalDate hoy);
+
+    /** Los Admin del local, también los dados de baja, por nombre y después por id (HU-16). */
+    List<Usuario> listarAdminsDelLocal(Long localId);
+
+    /**
+     * Un Admin del local, con la fila bloqueada como en el login: desbloquearlo no se cruza con un intento que suma.
+     * Vacío si no existe, es de otro rol o es de otro local.
+     */
+    Optional<Usuario> buscarAdminParaModificar(Long id, Long localId);
+
+    /** Si algún usuario, de cualquier local y rol, ya tiene ese email, sin distinguir mayúsculas. */
+    boolean existeEmail(String email);
+
+    /**
+     * Como {@link #guardar}, para el alta de un Admin: la unique que puede saltar es la del email, y la traduce a
+     * "Ya hay un usuario con ese email".
+     */
+    Usuario guardarConEmail(Usuario usuario);
 }
