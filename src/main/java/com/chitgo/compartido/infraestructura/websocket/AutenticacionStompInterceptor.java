@@ -18,6 +18,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import com.chitgo.pedidos.dominio.puertos.ClienteSesionRepository;
+import com.chitgo.usuarios.dominio.puertos.LocalRepository;
 import com.chitgo.usuarios.dominio.TokenInvalidoException;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 import com.chitgo.usuarios.infraestructura.seguridad.AutenticadorPorToken;
@@ -38,11 +39,13 @@ public class AutenticacionStompInterceptor implements ChannelInterceptor {
 
     private final AutenticadorPorToken autenticadorDelPersonal;
     private final ClienteSesionRepository sesiones;
+    private final LocalRepository locales;
 
     public AutenticacionStompInterceptor(AutenticadorPorToken autenticadorDelPersonal,
-            ClienteSesionRepository sesiones) {
+            ClienteSesionRepository sesiones, LocalRepository locales) {
         this.autenticadorDelPersonal = autenticadorDelPersonal;
         this.sesiones = sesiones;
+        this.locales = locales;
     }
 
     @Override
@@ -64,6 +67,12 @@ public class AutenticacionStompInterceptor implements ChannelInterceptor {
     }
 
     private Principal autenticar(StompHeaderAccessor acc) {
+        String tokenPantalla = acc.getFirstNativeHeader("tokenPantalla");
+        if (tokenPantalla != null) {
+            return locales.buscarPorTokenPantalla(tokenPantalla)
+                    .map(l -> new PrincipalDePantalla(l.getId()))
+                    .orElseThrow(() -> new MessagingException("La pantalla no está disponible"));
+        }
         String tokenSesion = acc.getFirstNativeHeader(HEADER_TOKEN_SESION);
         if (tokenSesion != null) {
             return sesiones.buscarPorToken(tokenSesion)
@@ -85,6 +94,12 @@ public class AutenticacionStompInterceptor implements ChannelInterceptor {
     private void validarSuscripcion(Principal usuario, String destino) {
         if (destino == null) {
             throw new MessagingException("Falta el destino");
+        }
+        if (usuario instanceof PrincipalDePantalla pantalla) {
+            if (!("/topic/local/" + pantalla.localId() + "/pantalla").equals(destino)) {
+                throw new MessagingException("Destino no permitido");
+            }
+            return;
         }
         if (usuario instanceof PrincipalDeCliente) {
             if (!DESTINO_CLIENTE.equals(destino)) {

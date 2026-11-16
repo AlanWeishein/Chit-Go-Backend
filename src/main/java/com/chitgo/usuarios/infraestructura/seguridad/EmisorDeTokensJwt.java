@@ -74,13 +74,15 @@ public class EmisorDeTokensJwt implements EmisorDeTokens {
 
         String rol = claims.get(ROL, String.class);
         Boolean debeCambiarCredencial = claims.get(DEBE_CAMBIAR_CREDENCIAL, Boolean.class);
-        if (claims.getSubject() == null || rol == null || debeCambiarCredencial == null || claims.getExpiration() == null) {
+        // Sin iat no se puede comparar con el "válido desde" del logout: no sirve.
+        if (claims.getSubject() == null || rol == null || debeCambiarCredencial == null || claims.getExpiration() == null
+                || claims.getIssuedAt() == null) {
             throw new TokenInvalidoException("Al token le faltan datos");
         }
         try {
             DatosDeSesion datos = new DatosDeSesion(
                     Long.valueOf(claims.getSubject()), rol, claims.get(LOCAL_ID, Long.class), debeCambiarCredencial);
-            return new TokenLeido(datos, claims.getExpiration().toInstant());
+            return new TokenLeido(datos, claims.getExpiration().toInstant(), claims.getIssuedAt().toInstant());
         } catch (JwtException | IllegalArgumentException e) {
             throw new TokenInvalidoException("Al token le faltan datos", e);
         }

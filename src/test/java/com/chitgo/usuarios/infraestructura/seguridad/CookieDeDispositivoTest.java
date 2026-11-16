@@ -7,11 +7,14 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseCookie;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
+
 class CookieDeDispositivoTest {
 
     @Test
     void esHttpOnlyStrictViveSieteDiasYSoloViajaAAuth() {
-        ResponseCookie cookie = new CookieDeDispositivo(new CookieDeSesion(true)).crear("la.habilitacion.firmada");
+        ResponseCookie cookie = new CookieDeDispositivo(new CookieDeSesion(true), ReglasDePrueba.DE_HOY)
+                .crear("la.habilitacion.firmada");
 
         assertThat(cookie.getName()).isEqualTo(CookieDeDispositivo.NOMBRE);
         assertThat(cookie.getValue()).isEqualTo("la.habilitacion.firmada");
@@ -24,6 +27,6 @@ class CookieDeDispositivoTest {
 
     @Test
     void enDesarrolloVaSinSecureComoLaDeSesion() {
-        assertThat(new CookieDeDispositivo(new CookieDeSesion(false)).crear("x").isSecure()).isFalse();
+        assertThat(new CookieDeDispositivo(new CookieDeSesion(false), ReglasDePrueba.DE_HOY).crear("x").isSecure()).isFalse();
     }
 }

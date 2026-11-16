@@ -10,6 +10,7 @@ import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
+import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.compartido.dominio.RelojDePrueba;
 import com.chitgo.usuarios.dominio.DatosDeSesion;
 import com.chitgo.usuarios.dominio.DispositivoHabilitado;
@@ -25,7 +26,7 @@ class EmisorDeHabilitacionesJwtTest {
     private static final Duration SIETE_DIAS = Duration.ofDays(7);
 
     private final RelojDePrueba reloj = new RelojDePrueba(INICIO);
-    private final EmisorDeHabilitacionesJwt emisor = new EmisorDeHabilitacionesJwt(CLAVE, reloj);
+    private final EmisorDeHabilitacionesJwt emisor = new EmisorDeHabilitacionesJwt(CLAVE, reloj, ReglasDePrueba.DE_HOY);
 
     @Test
     void diceQueMozoEntroConContrasenaYCuando() {
@@ -86,7 +87,7 @@ class EmisorDeHabilitacionesJwtTest {
 
     @Test
     void rechazaUnaHabilitacionFirmadaConOtraClave() {
-        String deOtraClave = new EmisorDeHabilitacionesJwt(OTRA_CLAVE, reloj).emitir(3L);
+        String deOtraClave = new EmisorDeHabilitacionesJwt(OTRA_CLAVE, reloj, ReglasDePrueba.DE_HOY).emitir(3L);
 
         assertThatThrownBy(() -> emisor.leer(deOtraClave)).isInstanceOf(TokenInvalidoException.class);
     }

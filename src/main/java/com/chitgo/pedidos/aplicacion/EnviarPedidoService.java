@@ -13,6 +13,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.chitgo.compartido.dominio.AccesoDenegadoException;
+import com.chitgo.compartido.dominio.ConflictoDeConcurrenciaException;
 import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
 import com.chitgo.compartido.dominio.Reloj;
@@ -78,6 +79,15 @@ public class EnviarPedidoService {
                 Pedido ganador = pedidos.buscarPorUuidCliente(uuidCliente.toString()).orElseThrow(() -> e);
                 return reintento(ganador, sesion);
             });
+        } catch (ConflictoDeConcurrenciaException e) {
+            // Subir la versión de la cuenta (opción A) hace que un doble toque del mismo pedido choque en la cuenta
+            // antes que en el UNIQUE de uuid_cliente. Si el que ganó guardó ese uuid, es un reintento: se devuelve su
+            // pedido con 200 (RNF-09). Si no, es un choque con el cierre de la cuenta u otro envío: 409.
+            return lectura.execute(estado -> {
+                ClienteSesion sesion = sesionDe(tokenSesion);
+                Pedido ganador = pedidos.buscarPorUuidCliente(uuidCliente.toString()).orElseThrow(() -> e);
+                return reintento(ganador, sesion);
+            });
         }
     }
 
@@ -108,13 +118,21 @@ public class EnviarPedidoService {
         Long localId = sesion.getLocalId();
         Pedido pedido = new Pedido(localId, cuenta, sesion, uuidCliente.toString(), ahora);
         agregarItems(pedido, localId, solicitados);
+
+        // La cuenta se escribe ANTES del pedido: su UPDATE toma el lock de la fila y el INSERT del pedido (cuya FK toma
+        // un lock compartido sobre la cuenta) no puede trabarse con otro envío ni con el cierre.
+        // Con la cuenta solicitada se puede seguir pidiendo: vuelve a Abierta y se avisa a Caja (06/10). Si no, se sube
+        // igual la versión de la cuenta: así un envío y el cierre chocan con el @Version y el segundo recibe 409 (30/10).
+        boolean reabierta = cuenta.reabrirSiEstabaSolicitada();
+        if (reabierta) {
+            cuentas.guardar(cuenta);
+        } else {
+            cuentas.subirVersion(cuenta);
+        }
         Pedido guardado = pedidos.guardar(pedido);
 
         Long mesaId = cuenta.getMesa().getId();
-        // Con la cuenta solicitada se puede seguir pidiendo: vuelve a Abierta y se avisa a Caja (06/10).
-        boolean estabaSolicitada = cuenta.getEstado() == EstadoCuenta.SOLICITADA;
-        if (estabaSolicitada && cuenta.reabrirSiEstabaSolicitada()) {
-            cuentas.guardar(cuenta);
+        if (reabierta) {
             eventos.aCaja(localId, EventoTiempoReal.de(TipoEvento.CUENTA_REABIERTA, guardado.getId(), mesaId,
                     EstadoCuenta.ABIERTA.name(), null, ahora));
         }

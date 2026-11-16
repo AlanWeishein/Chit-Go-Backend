@@ -95,9 +95,178 @@ class UsuarioTest {
         assertThat(pedro.getHashPassword()).isEqualTo("contrasena");
     }
 
+    /** El número sale de chitgo.reglas.intentos-para-bloquear: con 3, al tercero ya queda bloqueado. */
+    @Test
+    void conTresIntentosParaBloquearAlTerceroQuedaBloqueado() {
+        juan.registrarIntentoFallido(3);
+        juan.registrarIntentoFallido(3);
+        assertThat(juan.estaBloqueado(AHORA)).isFalse();
+
+        juan.registrarIntentoFallido(3);
+
+        assertThat(juan.getIntentosFallidos()).isEqualTo((short) 3);
+        assertThat(juan.getBloqueadoHasta()).isEqualTo(Usuario.BLOQUEO_SIN_VENCIMIENTO);
+    }
+
+    /** Con los 5 de hoy (RNF-07), el valor por defecto de la propiedad. */
     private void fallar(int veces) {
         for (int i = 0; i < veces; i++) {
-            juan.registrarIntentoFallido();
+            juan.registrarIntentoFallido(5);
         }
+    }
+
+    // --- HU-14: alta, edición y baja de empleados
+
+    @Test
+    void unUsuarioComunNaceSinContrasenaProvisoria() {
+        assertThat(juan.isContrasenaProvisoria()).isFalse();
+        assertThat(juan.isActivo()).isTrue();
+    }
+
+    @Test
+    void elAltaDeUnMozoLoDejaConCambioObligatorioYContrasenaProvisoria() {
+        // CP-27-01
+        Usuario pedro = Usuario.nuevoEmpleado(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", "hashPass", "hashPin");
+
+        assertThat(pedro.isDebeCambiarCredencial()).isTrue();
+        assertThat(pedro.isContrasenaProvisoria()).isTrue();
+        assertThat(pedro.isActivo()).isTrue();
+        assertThat(pedro.getLocalId()).isEqualTo(1L);
+        assertThat(pedro.getNombreUsuario()).isEqualTo("pedro");
+        assertThat(pedro.getHashPassword()).isEqualTo("hashPass");
+        assertThat(pedro.getPinHash()).isEqualTo("hashPin");
+        assertThat(pedro.getEmail()).isNull();
+    }
+
+    @Test
+    void elAltaDeCajaYCocinaTieneCambioObligatorioPeroNoContrasenaProvisoria() {
+        for (String codigo : new String[] {"CAJA", "COCINA"}) {
+            Usuario nuevo = Usuario.nuevoEmpleado(1L, new Rol(codigo, codigo), "Nuevo", null, null, "hashPin");
+
+            assertThat(nuevo.isDebeCambiarCredencial()).as(codigo).isTrue();
+            assertThat(nuevo.isContrasenaProvisoria()).as(codigo).isFalse();
+            assertThat(nuevo.getNombreUsuario()).as(codigo).isNull();
+            assertThat(nuevo.getHashPassword()).as(codigo).isNull();
+        }
+    }
+
+    @Test
+    void renombrarCambiaElNombreYElUsuarioYNadaMas() {
+        fallar(3);
+
+        juan.renombrar("Juan Pablo", "juanpa");
+
+        assertThat(juan.getNombre()).isEqualTo("Juan Pablo");
+        assertThat(juan.getNombreUsuario()).isEqualTo("juanpa");
+        assertThat(juan.getRol().getCodigo()).isEqualTo("MOZO");
+        assertThat(juan.getHashPassword()).isEqualTo("hash");
+        assertThat(juan.getPinHash()).isEqualTo("hash");
+        assertThat(juan.getIntentosFallidos()).isEqualTo((short) 3);
+        assertThat(juan.isActivo()).isTrue();
+    }
+
+    @Test
+    void darDeBajaLoDesactivaYLaSegundaVezNoCambiaNada() {
+        // CP-27-04
+        assertThat(juan.darDeBaja()).isTrue();
+        assertThat(juan.isActivo()).isFalse();
+
+        assertThat(juan.darDeBaja()).isFalse();
+        assertThat(juan.isActivo()).isFalse();
+    }
+
+    @Test
+    void darDeBajaNoTocaLasCredencialesNiElBloqueo() {
+        fallar(5);
+
+        juan.darDeBaja();
+
+        assertThat(juan.getPinHash()).isEqualTo("hash");
+        assertThat(juan.getHashPassword()).isEqualTo("hash");
+        assertThat(juan.getBloqueadoHasta()).isEqualTo(Usuario.BLOQUEO_SIN_VENCIMIENTO);
+    }
+
+    // --- HU-14: blanqueo del PIN y contraseña provisoria
+
+    @Test
+    void elBlanqueoDestrabaAlBloqueadoYDejaElPinProvisorio() {
+        // CP-10-06
+        fallar(5);
+        juan.elegirCredencial("pinElegido", null);
+
+        juan.blanquearPin("pinProvisorio");
+
+        assertThat(juan.getPinHash()).isEqualTo("pinProvisorio");
+        assertThat(juan.getIntentosFallidos()).isZero();
+        assertThat(juan.getBloqueadoHasta()).isNull();
+        assertThat(juan.estaBloqueado(AHORA)).isFalse();
+        assertThat(juan.isDebeCambiarCredencial()).isTrue();
+    }
+
+    @Test
+    void elBlanqueoNoTocaLaContrasenaNiLaContrasenaProvisoria() {
+        Usuario pedro = Usuario.nuevoEmpleado(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", "hashPass", "hashPin");
+        juan.blanquearPin("pinProvisorio");
+        pedro.blanquearPin("pinProvisorio");
+
+        // Juan ya había elegido su contraseña: el blanqueo no se la vuelve a pedir.
+        assertThat(juan.isContrasenaProvisoria()).isFalse();
+        assertThat(juan.getHashPassword()).isEqualTo("hash");
+        // Pedro todavía no la había elegido: sigue provisoria.
+        assertThat(pedro.isContrasenaProvisoria()).isTrue();
+        assertThat(pedro.getHashPassword()).isEqualTo("hashPass");
+    }
+
+    @Test
+    void elegirLaContrasenaApagaLaContrasenaProvisoria() {
+        Usuario pedro = Usuario.nuevoEmpleado(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", "hashPass", "hashPin");
+
+        pedro.elegirCredencial("pinNuevo", "passNueva");
+
+        assertThat(pedro.isContrasenaProvisoria()).isFalse();
+        assertThat(pedro.isDebeCambiarCredencial()).isFalse();
+        assertThat(pedro.getHashPassword()).isEqualTo("passNueva");
+    }
+
+    @Test
+    void elegirSoloElPinDejaLaContrasenaProvisoriaComoEstaba() {
+        Usuario pedro = Usuario.nuevoEmpleado(1L, new Rol("MOZO", "Mozo"), "Pedro", "pedro", "hashPass", "hashPin");
+
+        pedro.elegirCredencial("pinNuevo", null);
+
+        assertThat(pedro.isContrasenaProvisoria()).isTrue();
+    }
+
+    // --- El "válido desde" del logout (CP-13-01)
+
+    @Test
+    void sinLogoutValeCualquierToken() {
+        assertThat(juan.getSesionValidaDesde()).isNull();
+        assertThat(juan.aceptaSesionEmitidaEn(AHORA.minus(Duration.ofDays(30)))).isTrue();
+    }
+
+    @Test
+    void elLogoutGuardaElSegundoSinLaFraccion() {
+        // Si se guardara 12:00:00.700, MySQL lo redondearía a 12:00:01 y el login de 12:00:00.900 no serviría.
+        juan.cerrarSesiones(AHORA.plusMillis(700));
+
+        assertThat(juan.getSesionValidaDesde()).isEqualTo(AHORA);
+    }
+
+    @Test
+    void despuesDelLogoutNoValeUnTokenDeUnSegundoAntes() {
+        juan.cerrarSesiones(AHORA.plusMillis(700));
+
+        assertThat(juan.aceptaSesionEmitidaEn(AHORA.minusSeconds(1))).isFalse();
+        assertThat(juan.aceptaSesionEmitidaEn(AHORA.plusSeconds(1))).isTrue();
+    }
+
+    @Test
+    void unTokenDelMismoSegundoDelLogoutVale() {
+        // El iat viene en segundos: el login de enseguida, en el mismo segundo, tiene que entrar. Es la ventana de
+        // un segundo que queda como límite (ST-23, tarea 3).
+        juan.cerrarSesiones(AHORA.plusMillis(700));
+
+        assertThat(juan.aceptaSesionEmitidaEn(AHORA)).isTrue();
     }
 }

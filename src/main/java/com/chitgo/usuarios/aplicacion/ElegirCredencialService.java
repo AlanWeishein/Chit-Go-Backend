@@ -34,9 +34,9 @@ public class ElegirCredencialService {
     }
 
     /**
-     * Mozo, Caja y Cocina eligen el PIN, y el Admin y el Gerente/Dueño, la contraseña. El mozo puede elegir
-     * también la contraseña: en el primer ingreso el front se la pide (P-32b); después de un blanqueo de PIN,
-     * no. Cada una tiene que ser distinta de la que tenía.
+     * Mozo, Caja y Cocina eligen el PIN, y el Admin y el Gerente/Dueño, la contraseña. El mozo con la contraseña
+     * provisoria (la del alta) tiene que elegir también la contraseña (P-32b); después de un blanqueo de PIN es
+     * opcional. Cada una tiene que ser distinta de la que tenía.
      *
      * @throws SinSesionException               si el usuario ya no existe o está dado de baja
      * @throws CredencialYaElegidaException      si su credencial no es provisoria
@@ -59,7 +59,8 @@ public class ElegirCredencialService {
         if (rol.entraConPin() && pin == null) {
             throw CredencialNuevaInvalidaException.faltaElPin();
         }
-        if (rol.entraConEmail() && password == null) {
+        // La contraseña provisoria se mira en la base, como la marca (decidido el 20/10, punto 10).
+        if ((rol.entraConEmail() || usuario.isContrasenaProvisoria()) && password == null) {
             throw CredencialNuevaInvalidaException.faltaLaContrasena();
         }
         boolean pinNoCorresponde = pin != null && !rol.entraConPin();
