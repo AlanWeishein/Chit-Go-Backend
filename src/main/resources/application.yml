@@ -21,8 +21,15 @@ spring:
 
 server:
   port: 8080
+  # Despliegue directo: los headers Forwarded/X-Forwarded-For del cliente no definen su IP.
+  forward-headers-strategy: none
 
 chitgo:
+  seguridad:
+    login-email:
+      solicitudes: 3
+      ventana: 60s
+      maximo-de-claves: 10000
   push:
     habilitado: ${PUSH_HABILITADO:false}
     clave-publica: ${PUSH_CLAVE_PUBLICA:}

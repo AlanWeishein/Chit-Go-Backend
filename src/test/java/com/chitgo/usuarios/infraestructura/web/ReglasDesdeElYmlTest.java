@@ -27,6 +27,7 @@ import com.chitgo.usuarios.infraestructura.seguridad.CookieDeSesion;
  */
 @SpringBootTest(properties = {
         "chitgo.reglas.intentos-para-bloquear=3",
+        "chitgo.seguridad.login-email.solicitudes=2",
         "chitgo.reglas.sesion-de-caja=2h"})
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")

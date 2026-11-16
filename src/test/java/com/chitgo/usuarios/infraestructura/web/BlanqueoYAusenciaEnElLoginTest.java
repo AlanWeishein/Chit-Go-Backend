@@ -87,9 +87,11 @@ class BlanqueoYAusenciaEnElLoginTest {
 
     private List<Map<String, Object>> hashesDeLaSeed;
     private Long ultimaAuditoriaAntes;
+    private Cookie sesionAdmin;
 
     @BeforeEach
     void guardarComoEstaLaSeed() {
+        sesionAdmin = null;
         hashesDeLaSeed = jdbc.queryForList("SELECT id, pin_hash, hash_password FROM usuario");
         ultimaAuditoriaAntes = jdbc.queryForObject("SELECT COALESCE(MAX(id), 0) FROM registro_auditoria", Long.class);
     }
@@ -376,12 +378,15 @@ class BlanqueoYAusenciaEnElLoginTest {
     }
 
     private Cookie sesionDelAdmin() throws Exception {
+        // Las operaciones de un mismo caso usan la sesión abierta, como el cliente real.
+        if (sesionAdmin != null) return sesionAdmin;
         Cookie xsrf = xsrf();
         String cuerpo = json.writeValueAsString(Map.of("email", "admin@laesquina.test", "password", CONTRASENA));
-        return mvc.perform(post("/api/v1/auth/admin/login").cookie(xsrf).header("X-XSRF-TOKEN", xsrf.getValue())
+        sesionAdmin = mvc.perform(post("/api/v1/auth/admin/login").cookie(xsrf).header("X-XSRF-TOKEN", xsrf.getValue())
                         .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getCookie(CookieDeSesion.NOMBRE);
+        return sesionAdmin;
     }
 
     private ResultActions elegir(Cookie sesion, String pin, String password) throws Exception {

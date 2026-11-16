@@ -1,7 +1,9 @@
 package com.chitgo.usuarios.infraestructura.web;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -13,6 +15,7 @@ import com.chitgo.usuarios.dominio.CredencialesIncorrectasException;
 import com.chitgo.usuarios.dominio.PinIncorrectoException;
 import com.chitgo.usuarios.dominio.UsuarioBloqueadoException;
 import com.chitgo.usuarios.dominio.UsuarioOContrasenaIncorrectosException;
+import com.chitgo.usuarios.infraestructura.seguridad.LimiteDeLoginExcedidoException;
 
 /**
  * Los errores del login y del primer ingreso, en ProblemDetail, con los mensajes de HU-04. Van acá y no en ManejadorDeErrores para
@@ -20,6 +23,13 @@ import com.chitgo.usuarios.dominio.UsuarioOContrasenaIncorrectosException;
  */
 @RestControllerAdvice
 class ErroresDeIngreso {
+
+    @ExceptionHandler(LimiteDeLoginExcedidoException.class)
+    ResponseEntity<ProblemDetail> demasiadosIngresos(LimiteDeLoginExcedidoException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(e.segundosDeEspera()))
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage()));
+    }
 
     @ExceptionHandler(PinIncorrectoException.class)
     ProblemDetail pinIncorrecto(PinIncorrectoException e) {

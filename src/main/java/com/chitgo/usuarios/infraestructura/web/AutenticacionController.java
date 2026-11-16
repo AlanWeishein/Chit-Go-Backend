@@ -1,6 +1,7 @@
 package com.chitgo.usuarios.infraestructura.web;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,6 +30,8 @@ import com.chitgo.usuarios.aplicacion.dto.SesionDto;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeDispositivo;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeSesion;
+import com.chitgo.usuarios.infraestructura.seguridad.ClaveDeEmailParaLimite;
+import com.chitgo.usuarios.infraestructura.seguridad.LimitadorDeLoginPorEmail;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -43,11 +46,14 @@ public class AutenticacionController {
     private final CerrarSesionService cerrarSesion;
     private final CookieDeSesion cookieDeSesion;
     private final CookieDeDispositivo cookieDeDispositivo;
+    private final LimitadorDeLoginPorEmail limiteDeLogin;
+    private final ClaveDeEmailParaLimite clavesDeEmail;
 
     public AutenticacionController(ConsultarSesionService consultarSesion, IngresarConPinService ingresarConPin,
             IngresarConEmailService ingresarConEmail, HabilitarDispositivoService habilitarDispositivo,
             ConsultarDispositivoService consultarDispositivo, ElegirCredencialService elegirCredencial,
-            CerrarSesionService cerrarSesion, CookieDeSesion cookieDeSesion, CookieDeDispositivo cookieDeDispositivo) {
+            CerrarSesionService cerrarSesion, CookieDeSesion cookieDeSesion, CookieDeDispositivo cookieDeDispositivo,
+            LimitadorDeLoginPorEmail limiteDeLogin, ClaveDeEmailParaLimite clavesDeEmail) {
         this.consultarSesion = consultarSesion;
         this.ingresarConPin = ingresarConPin;
         this.ingresarConEmail = ingresarConEmail;
@@ -57,6 +63,8 @@ public class AutenticacionController {
         this.cerrarSesion = cerrarSesion;
         this.cookieDeSesion = cookieDeSesion;
         this.cookieDeDispositivo = cookieDeDispositivo;
+        this.limiteDeLogin = limiteDeLogin;
+        this.clavesDeEmail = clavesDeEmail;
     }
 
     /** Deja la cookie con el JWT y devuelve lo mismo que /auth/sesion. El mozo, además, necesita la de dispositivo. */
@@ -95,7 +103,10 @@ public class AutenticacionController {
 
     /** Admin y Gerente/Dueño (P-12). Como el de PIN: deja la cookie y devuelve lo mismo que /auth/sesion. */
     @PostMapping("/admin/login")
-    public ResponseEntity<SesionDto> adminLogin(@Valid @RequestBody IngresoConEmailDto pedido) {
+    public ResponseEntity<SesionDto> adminLogin(@Valid @RequestBody IngresoConEmailDto pedido,
+            HttpServletRequest request) {
+        // CSRF y @Valid ya pasaron. No usar headers de proxy enviados por el cliente.
+        limiteDeLogin.verificar(request.getRemoteAddr(), clavesDeEmail.de(pedido.email()));
         return conCookie(ingresarConEmail.ingresar(pedido.email(), pedido.password()));
     }
 

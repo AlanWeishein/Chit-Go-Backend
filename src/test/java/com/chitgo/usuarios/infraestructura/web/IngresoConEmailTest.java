@@ -10,11 +10,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
+import java.time.Instant;
+
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,6 +31,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
 import com.chitgo.usuarios.dominio.Usuario;
+import com.chitgo.compartido.dominio.RelojDePrueba;
 import com.chitgo.usuarios.infraestructura.seguridad.CookieDeSesion;
 
 /**
@@ -36,6 +43,18 @@ import com.chitgo.usuarios.infraestructura.seguridad.CookieDeSesion;
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
 class IngresoConEmailTest {
+
+    @TestConfiguration
+    static class ConRelojDePrueba {
+        @Bean
+        @Primary
+        RelojDePrueba relojDePrueba() {
+            return new RelojDePrueba(Instant.now());
+        }
+    }
+
+    @Autowired
+    private RelojDePrueba reloj;
 
     private static final String LOGIN = "/api/v1/auth/admin/login";
     private static final String ADMIN = "admin@laesquina.test";
@@ -153,8 +172,37 @@ class IngresoConEmailTest {
     }
 
     @Test
+    void cincoRequestsFallidasDesdeCeroPuedenBloquearAlAdmin() throws Exception {
+        // Reproducción histórica conservada como regresión de RNF-07: los intentos ahora se espacian.
+        // La ráfaga sin espera se verifica en LimiteDeLoginPorEmailTest y debe recibir 429.
+        assertThat(intentos(ADMIN)).isZero();
+
+        for (int i = 1; i <= 5; i++) {
+            if (i == 4) reloj.avanzar(Duration.ofSeconds(60));
+            ingresar(ADMIN, "contrasenaIncorrecta" + i)
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.detail").value(INCORRECTOS))
+                    .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+            assertThat(intentos(ADMIN)).isEqualTo(i);
+        }
+
+        ingresar(ADMIN, CONTRASENA)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value(INCORRECTOS))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        assertThat(intentos(ADMIN)).isEqualTo(5);
+        assertThat(jdbc.queryForObject(
+                "SELECT UNIX_TIMESTAMP(bloqueado_hasta) FROM usuario WHERE email = ?",
+                Long.class, ADMIN
+        )).isEqualTo(Usuario.BLOQUEO_SIN_VENCIMIENTO.getEpochSecond());
+    }
+
+    @Test
     void elGerenteDuenoTambienSeBloquea() throws Exception {
         for (int i = 1; i <= 5; i++) {
+            if (i == 4) reloj.avanzar(Duration.ofSeconds(60));
             ingresar(DUENO, "otraContrasena" + i).andExpect(status().isUnauthorized());
         }
         ingresar(DUENO, CONTRASENA).andExpect(status().isUnauthorized());

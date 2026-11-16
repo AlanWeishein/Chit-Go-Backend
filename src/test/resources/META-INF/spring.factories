@@ -1,0 +1,3 @@
+# Los contextos Spring se comparten; los cupos de un caso no deben contaminar el siguiente.
+org.springframework.test.context.TestExecutionListener=\
+com.chitgo.usuarios.infraestructura.seguridad.RestaurarLimitesDeLogin
