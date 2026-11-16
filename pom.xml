@@ -25,6 +25,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>3.5.4</version>
+    </dependency>
+    <dependency>
       <groupId>nl.martijndwars</groupId>
       <artifactId>web-push</artifactId>
       <version>5.1.2</version>
@@ -134,4 +139,19 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>carga</id>
+      <properties><carga.minutos>1</carga.minutos></properties>
+      <build><plugins><plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <includes><include>**/CargaSprint3IT.java</include></includes>
+          <systemPropertyVariables><carga.minutos>${carga.minutos}</carga.minutos></systemPropertyVariables>
+        </configuration>
+      </plugin></plugins></build>
+    </profile>
+  </profiles>
 </project>

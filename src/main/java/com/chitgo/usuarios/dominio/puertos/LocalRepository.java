@@ -10,4 +10,6 @@ public interface LocalRepository {
 
     /** El token del QR de staff, que identifica al local antes del login (RF-13). */
     Optional<Local> buscarPorTokenStaff(String tokenStaff);
+
+    Optional<Local> buscarPorTokenPantalla(String tokenPantalla);
 }
