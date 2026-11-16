@@ -9,7 +9,7 @@ Referencia de coordinación: ST-22 de Ezequiel (14/11); su implementación de HU
 | Mesas, QR e inhabilitar (HU-13) | Implementada y validada con MySQL |
 | Reportes y consulta de auditoría (HU-15) | Implementada y validada con MySQL |
 | Pantalla del salón (HU-17) | Implementada y validada con MySQL y autorización STOMP |
-| Carga: RNF-01, RNF-03 y RNF-06 | Pendiente |
+| Carga: RNF-01, RNF-03 y RNF-06 | Ensayo local ejecutado; pendiente red/front del local |
 | Integración final y errores (compartida) | Pendiente |
 
 ## HU-13: contrato para P-15 y P-38
@@ -111,3 +111,12 @@ servidor filtra el payload explícitamente y publica después del commit.
 Validación: 9 pruebas de snapshot/aislamiento, tokens desconocidos o de staff, permiso del Admin,
 suscripciones STOMP, prohibición de SEND y publicación pública tras commit. La migración se probó
 en MySQL 8.4; agrega la columna antes de rellenarla para evitar el error de ADD con default aleatorio.
+
+## Carga
+
+Perfil reproducible y metodología en [pruebas-de-carga.md](pruebas-de-carga.md).
+Resultado del 16/11/2026: 30 mesas, ráfaga de 30 pedidos y un minuto a 10 pedidos/minuto,
+sin pérdida ni mezcla de cuentas. p95 servidor → recepción en KDS: **16,44 ms** en ráfaga y
+**9,52 ms** sostenido, por debajo de 2000 ms. El ensayo usa HTTP/STOMP reales y MySQL de Docker,
+con fixtures aislados que se eliminan al terminar. Evidencia: [resultados-carga-sprint3.json](resultados-carga-sprint3.json).
+Esto no verifica la red Wi-Fi/TV ni el render del front; esa comprobación requiere el local.
