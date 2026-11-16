@@ -150,7 +150,8 @@ encabezado del SQL.
   - 401 "Email o contraseña incorrectos", siempre el mismo: el email no existe, la contraseña está mal, o
     el usuario está bloqueado o dado de baja. Acá no hay 423. La contraseña mal suma un intento, y al
     quinto seguido queda bloqueado (lo destraba el Gerente/Dueño).
-  - 400: falta un dato, o la contraseña no tiene de 8 a 64 caracteres o pasa de 72 bytes (con acentos o
+  - 400: falta un dato, el email no tiene formato válido o supera 160 caracteres (incluidos los espacios
+    pegados al borde), o la contraseña no tiene de 8 a 64 caracteres o pasa de 72 bytes (con acentos o
     emojis cada carácter ocupa más de uno). No suma intentos.
 
 ### Primer ingreso (P-29, P-30, P-31 y P-32b)
