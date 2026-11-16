@@ -899,7 +899,8 @@ auditor.registrar(localId, usuarioId, "APROBAR_PEDIDO", "PEDIDO", pedido.getId()
 - No se audita lo que hace el cliente anónimo, ni los ingresos y bloqueos.
 - Nadie edita ni borra un registro desde la aplicación: el repositorio solo guarda y lee.
 
-## Pendiente
+## Sprint 3
 
-- Consulta de la auditoría con filtros y paginada (HU-15, Sprint 3).
-- Retención de 6 meses de la auditoría (RNF-13): hace falta una forma de borrar que hoy el repositorio no tiene.
+Gestión de mesas y QR (HU-13), reportes y consulta de auditoría (HU-15):
+contratos y decisiones en [docs/sprint-3-german.md](docs/sprint-3-german.md).
+La auditoría tiene filtros y paginación; la retención de seis meses se ejecuta como mantenimiento interno.

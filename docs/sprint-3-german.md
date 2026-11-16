@@ -7,7 +7,7 @@ Referencia de coordinación: ST-22 de Ezequiel (14/11); su implementación de HU
 | Tarea | Estado |
 |---|---|
 | Mesas, QR e inhabilitar (HU-13) | Implementada y validada con MySQL |
-| Reportes y consulta de auditoría (HU-15) | Pendiente |
+| Reportes y consulta de auditoría (HU-15) | Implementada y validada con MySQL |
 | Pantalla del salón (HU-17) | Pendiente |
 | Carga: RNF-01, RNF-03 y RNF-06 | Pendiente |
 | Integración final y errores (compartida) | Pendiente |
@@ -48,3 +48,41 @@ en una colección Postman junto con el sprint al hacer la integración final.
 
 Validación HU-13: pruebas HTTP con MySQL real para gestión, permisos, CSRF, aislamiento, cuenta abierta,
 baja e historial; lectura del PNG con un decoder QR; regresión de gestión y persistencia de empleados.
+
+## HU-15: reportes y auditoría (P-17 y P-18)
+
+Todas son rutas GET. Requieren `reporte.ver` o `auditoria.ver`, según corresponda. Para Admin el local
+sale de su sesión; `localId` no permite ampliarlo. Las mismas rutas bajo `/gerente` requieren `localId`
+y comprueban que el local pertenezca al usuario. Un local ajeno responde 404. No se agregan acciones de
+gestión del Gerente/Dueño: solo la lectura que comparte HU-15 con HU-16.
+
+- `/api/v1/admin/reportes/ventas?desde=2026-11-01&hasta=2026-11-16&page=0&size=20`:
+  `{desde, hasta, totalVentas, cantidadCuentas, detalle}`. `detalle` es una página común de
+  `{cuentaId, cerradaEn, total}`. Solo suma cuentas CERRADA por su fecha de cierre; no duplica los
+  totales por joins con ítems. El total corresponde al período completo aunque cambie la página.
+- `/api/v1/admin/reportes/tiempos-preparacion`, mismos parámetros:
+  `{desde, hasta, cantidadPedidos, promedioSegundos, detalle}`. `detalle` pagina
+  `{pedidoId, enPreparacionEn, listoEn, segundos}`. Se filtra por `listoEn`, entre preparación y listo,
+  aun si luego se sirvió o cerró la cuenta. Excluye marcas incompletas/invertidas. Promedio con dos
+  decimales; sin pedidos es `null`, no un tiempo de cero inventado.
+- `/api/v1/admin/reportes/platos-mas-pedidos`, mismos parámetros: página común de
+  `{platoId, nombre, cantidad}`. Suma unidades por fecha de envío, excluye rechazados y cancelados,
+  incluye pendientes y aprobados. Orden: cantidad descendente, id ascendente para desempatar.
+- `/api/v1/admin/auditoria?entidad=PEDIDO&accion=APROBAR_PEDIDO&usuarioId=4&desde=2026-11-01&hasta=2026-11-16&page=0&size=20`:
+  página común de `{id, usuarioId, usuario, accion, entidad, entidadId, valorAnterior, valorNuevo, creadoEn}`.
+  Todos los filtros son opcionales; se combinan con AND. Los valores anterior/nuevo son JSON, no cadenas
+  escapadas. Orden estable: fecha e id descendentes. No hay POST, PUT, PATCH ni DELETE de auditoría.
+
+Los reportes requieren ambas fechas. Auditoría permite uno o ninguno de los límites. Las fechas son
+inclusivas en `chitgo.reglas.zona-horaria`: desde medianoche de `desde` hasta antes de medianoche del
+día siguiente a `hasta`. Un período invertido da 400. Las páginas vacías conservan los metadatos;
+ventas sin datos suma 0. El front puede mostrar los mensajes de HU-15 al recibir una lista vacía.
+
+RNF-13: mantenimiento interno a las 03:00 del local, elimina registros anteriores a seis meses de
+calendario en lotes de 1000, sin ruta pública. Configuración: `chitgo.auditoria.retencion-habilitada`
+(true por defecto) y `retencion-cron`. Las pruebas lo desactivan para evitar limpieza en segundo plano.
+La migración V8 agrega índices para los períodos y la retención.
+
+Validación: CP-28-01 ($38.500 y promedio de 15 minutos), totales independientes de la página,
+ranking por unidades, exclusión de otros locales y días, filtros, permisos, CSRF, lectura del Dueño
+y límite exacto de seis meses; además, regresión de escritura transaccional de auditoría.
