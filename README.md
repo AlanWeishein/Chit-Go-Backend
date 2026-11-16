@@ -82,6 +82,66 @@ turno todos los días de 00:00 a 23:59. No se cargan cuentas, pedidos, avisos, a
 ausencias: los crea cada caso de prueba. Los tokens de los QR (mesas y staff) están en el
 encabezado del SQL.
 
+## Alta de un local
+
+En el MVP 1 no hay pantallas para dar de alta un local (decidido el 10/10): se hace con dos comandos
+del mismo back, con el perfil `script`. Cada uno corre una vez contra la base de `DB_URL` (por
+defecto, la del Compose) y termina. Nunca corren al levantar el back con `dev` ni en los tests.
+
+- **`alta-local`** crea, en una sola transacción, al Gerente/Dueño (sin local, con la contraseña
+  provisoria y `debe_cambiar_credencial` en TRUE) y el local que lo apunta, con un `token_staff`
+  nuevo. Muestra el id del local, el token y la URL del login del personal
+  (`<front>/staff/<token>`; el front es `http://localhost:5173`, o lo que diga `URL_FRONT`). El
+  email lleva la misma regla que el login y es único en todo el sistema, sin importar las
+  mayúsculas: si está repetido o algún dato no sirve, no se guarda nada.
+- **`desbloquear-gerente`** vuelve los intentos a 0 y levanta el bloqueo del Gerente/Dueño, que no
+  tiene a nadie por encima que lo destrabe (punto 9 del 20/10). Si el email no es de un
+  Gerente/Dueño, o no estaba bloqueado, no cambia nada y lo dice.
+
+La contraseña provisoria **no va como argumento**, porque quedaría en el historial de la terminal: el
+comando la rechaza. Se lee de la variable `CHITGO_CONTRASENA` y, si no está, se pide por la consola
+(dos veces y sin mostrarla). En PowerShell, para cargarla sin que quede en el historial:
+
+```powershell
+$env:CHITGO_CONTRASENA = [System.Net.NetworkCredential]::new('', (Read-Host 'Contraseña provisoria' -AsSecureString)).Password
+mvn spring-boot:run "-Dspring-boot.run.profiles=script" "-Dspring-boot.run.arguments=alta-local --local='La Plaza' --direccion='Av. Siempre Viva 742' --gerente='Dueño La Plaza' --email=dueno@laplaza.test"
+Remove-Item Env:CHITGO_CONTRASENA
+```
+
+La dirección es opcional. Para desbloquear (no pide contraseña):
+
+```powershell
+mvn spring-boot:run "-Dspring-boot.run.profiles=script" "-Dspring-boot.run.arguments=desbloquear-gerente --email=dueno@laplaza.test"
+```
+
+- Sale con 0 si salió bien (también si no estaba bloqueado), con 1 si no cambió nada por los datos y
+  con 2 si el comando está mal escrito.
+- El back levanta unos segundos, solo en `127.0.0.1` y en un puerto libre, así que se puede correr con
+  el back andando. No corre Flyway: la base ya tiene que estar migrada.
+- Los dos quedan en la auditoría del local nuevo: `CREAR_LOCAL` (entidad `LOCAL`) y
+  `DESBLOQUEAR_GERENTE` (entidad `USUARIO`), con `"origen": "script"`. Como no hay nadie logueado,
+  figura el mismo Gerente/Dueño. La auditoría no dice qué persona corrió el script.
+- **Límite:** cualquiera que conozca el email del Gerente/Dueño lo puede dejar afuera con 5 intentos,
+  y solo se destraba con este comando (lo avisa OWASP; RNF-07 pide el bloqueo hasta que alguien lo
+  levante). Si se revisa, la otra opción del 20/10 es un bloqueo temporal solo para él.
+- **Ojo en dev:** la seed borra todos los datos de negocio cada vez que cambia el archivo (ver "Datos
+  de prueba"), y con ellos los locales creados con el script.
+- Si los acentos se ven mal en la consola, es la página de códigos de la terminal: en la base quedan
+  bien.
+
+Para borrar a mano un local de prueba recién creado (sin mesas, carta ni empleados todavía), en ese
+orden por las claves foráneas:
+
+```sql
+START TRANSACTION;
+SET @local = (SELECT id FROM local WHERE token_staff = '<token>');
+SET @gerente = (SELECT propietario_usuario_id FROM local WHERE id = @local);
+DELETE FROM registro_auditoria WHERE local_id = @local OR usuario_id = @gerente;
+DELETE FROM local WHERE id = @local;
+DELETE FROM usuario WHERE id = @gerente;
+COMMIT;
+```
+
 ## Sesión y CSRF (para el front)
 
 - La sesión del personal es un JWT en la cookie `chitgo_sesion` (HttpOnly, SameSite=Strict). El front

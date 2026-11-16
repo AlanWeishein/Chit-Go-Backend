@@ -1,0 +1,33 @@
+# Perfil script: corre un comando del script del local (HU-16) y termina. Lo usa ComandosDelLocal y no se
+# combina con dev. Cómo se corre está en el README, en "Alta de un local".
+spring:
+  main:
+    banner-mode: off
+  # El script no migra nada: la base ya tiene que estar como la deja el back. Además, sin db/dev en las
+  # locations, Flyway fallaría al validar contra una base que tiene la semilla de dev aplicada.
+  flyway:
+    enabled: false
+
+# El back necesita levantar como app web (SecurityConfig pide HttpSecurity), así que el servidor arranca
+# unos segundos, solo en la compu y en un puerto libre, para no chocar con el back si está corriendo.
+server:
+  address: 127.0.0.1
+  port: 0
+
+logging:
+  level:
+    root: WARN
+
+chitgo:
+  push:
+    habilitado: false
+  auditoria:
+    retencion-habilitada: false
+  alertas:
+    demora:
+      habilitada: false
+    mesa-sin-mozo:
+      habilitada: false
+  script:
+    # Para armar la URL del login del personal que muestra el alta: <url-front>/staff/<token_staff>.
+    url-front: ${URL_FRONT:http://localhost:5173}
