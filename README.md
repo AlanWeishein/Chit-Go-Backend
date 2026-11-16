@@ -901,6 +901,6 @@ auditor.registrar(localId, usuarioId, "APROBAR_PEDIDO", "PEDIDO", pedido.getId()
 
 ## Sprint 3
 
-Gestión de mesas y QR (HU-13), reportes y consulta de auditoría (HU-15):
+Gestión de mesas y QR (HU-13), reportes y consulta de auditoría (HU-15), pantalla del salón (HU-17):
 contratos y decisiones en [docs/sprint-3-german.md](docs/sprint-3-german.md).
 La auditoría tiene filtros y paginación; la retención de seis meses se ejecuta como mantenimiento interno.

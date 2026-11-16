@@ -51,4 +51,16 @@ class PublicadorStompTest {
         publicador.aMozos(1L, EventoTiempoReal.de(TipoEvento.AVISO_ATENDIDO, null, 1L, null, null, Instant.EPOCH));
         verifyNoInteractions(publisher);
     }
+
+    @Test
+    void pantallaRecibeSoloDatosPublicosDespuesDelCommit() {
+        var listo = EventoTiempoReal.de(TipoEvento.LISTO, 5L, 1L, "LISTO", "detalle interno", Instant.EPOCH);
+        publicador.aPantalla(1L, listo);
+        publicador.aPantalla(1L, EventoTiempoReal.de(TipoEvento.APROBADO, 6L, 1L, "APROBADO", null, Instant.EPOCH));
+        verifyNoInteractions(stomp);
+        TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+        verify(stomp).convertAndSend("/topic/local/1/pantalla",
+                new PublicadorStomp.EventoDePantalla(TipoEvento.LISTO, 5L, "LISTO", Instant.EPOCH.toString()));
+        verifyNoMoreInteractions(stomp);
+    }
 }

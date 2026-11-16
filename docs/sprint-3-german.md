@@ -8,7 +8,7 @@ Referencia de coordinación: ST-22 de Ezequiel (14/11); su implementación de HU
 |---|---|
 | Mesas, QR e inhabilitar (HU-13) | Implementada y validada con MySQL |
 | Reportes y consulta de auditoría (HU-15) | Implementada y validada con MySQL |
-| Pantalla del salón (HU-17) | Pendiente |
+| Pantalla del salón (HU-17) | Implementada y validada con MySQL y autorización STOMP |
 | Carga: RNF-01, RNF-03 y RNF-06 | Pendiente |
 | Integración final y errores (compartida) | Pendiente |
 
@@ -86,3 +86,28 @@ La migración V8 agrega índices para los períodos y la retención.
 Validación: CP-28-01 ($38.500 y promedio de 15 minutos), totales independientes de la página,
 ranking por unidades, exclusión de otros locales y días, filtros, permisos, CSRF, lectura del Dueño
 y límite exacto de seis meses; además, regresión de escritura transaccional de auditoría.
+
+## HU-17: pantalla del salón (P-20)
+
+1. El Admin obtiene `{localId, tokenPantalla}` con `GET /api/v1/admin/pantalla` (`local.configurar`).
+2. La pantalla, sin sesión de personal, consulta
+   `GET /api/v1/pantalla/{tokenPantalla}/pedidos-en-curso`. Devuelve `{localId, pedidos}`;
+   cada pedido contiene solamente `{id, mesa, estado}`. Solo EN_PREPARACION y LISTO, de cuentas
+   vigentes del local. Una lista vacía permite mostrar «No hay pedidos en preparación».
+3. Conecta a `/ws` con el header nativo STOMP `tokenPantalla` y se suscribe a
+   `/topic/local/{localId}/pantalla`. Ese principal solo puede escuchar ese destino: no otros locales,
+   canales internos ni `/user/queue/pedido`. Tampoco puede publicar SEND.
+4. Los eventos públicos contienen únicamente `{tipo, pedidoId, estado, ocurridoEn}`. Ante un evento,
+   volver a pedir el snapshot. SERVIDO y CANCELADO retiran el pedido; al reconectar se consulta el
+   estado completo. No hay replay. Para evitar perder cambios al iniciar, suscribirse antes de pedir
+   el snapshot y volver a consultarlo si llega un evento mientras se carga.
+
+La V9 genera un token propio por local, independiente del QR de staff. Los existentes y los INSERT
+por script reciben 18 bytes aleatorios como 36 caracteres hexadecimales; el constructor Java usa UUID.
+El token identifica acceso de lectura y debe compartirse solo con la pantalla correspondiente.
+No viajan precios, totales, observaciones, personal ni credenciales, tampoco en los eventos. El
+servidor filtra el payload explícitamente y publica después del commit.
+
+Validación: 9 pruebas de snapshot/aislamiento, tokens desconocidos o de staff, permiso del Admin,
+suscripciones STOMP, prohibición de SEND y publicación pública tras commit. La migración se probó
+en MySQL 8.4; agrega la columna antes de rellenarla para evitar el error de ADD con default aleatorio.
