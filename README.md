@@ -150,8 +150,7 @@ encabezado del SQL.
   - 401 "Email o contraseña incorrectos", siempre el mismo: el email no existe, la contraseña está mal, o
     el usuario está bloqueado o dado de baja. Acá no hay 423. La contraseña mal suma un intento, y al
     quinto seguido queda bloqueado (lo destraba el Gerente/Dueño).
-  - 400: falta un dato, el email no tiene formato válido o supera 160 caracteres (incluidos los espacios
-    pegados al borde), o la contraseña no tiene de 8 a 64 caracteres o pasa de 72 bytes (con acentos o
+  - 400: falta un dato, o la contraseña no tiene de 8 a 64 caracteres o pasa de 72 bytes (con acentos o
     emojis cada carácter ocupa más de uno). No suma intentos.
 
 ### Primer ingreso (P-29, P-30, P-31 y P-32b)
@@ -900,8 +899,7 @@ auditor.registrar(localId, usuarioId, "APROBAR_PEDIDO", "PEDIDO", pedido.getId()
 - No se audita lo que hace el cliente anónimo, ni los ingresos y bloqueos.
 - Nadie edita ni borra un registro desde la aplicación: el repositorio solo guarda y lee.
 
-## Sprint 3
+## Pendiente
 
-Gestión de mesas y QR (HU-13), reportes y consulta de auditoría (HU-15), pantalla del salón (HU-17):
-contratos y decisiones en [docs/sprint-3-german.md](docs/sprint-3-german.md).
-La auditoría tiene filtros y paginación; la retención de seis meses se ejecuta como mantenimiento interno.
+- Consulta de la auditoría con filtros y paginada (HU-15, Sprint 3).
+- Retención de 6 meses de la auditoría (RNF-13): hace falta una forma de borrar que hoy el repositorio no tiene.

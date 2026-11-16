@@ -8,7 +8,7 @@ import java.util.Set;
 
 import com.chitgo.usuarios.dominio.Ausencia;
 import com.chitgo.usuarios.dominio.Empleado;
-import com.chitgo.compartido.dominio.PaginaDe;
+import com.chitgo.usuarios.dominio.PaginaDe;
 import com.chitgo.usuarios.dominio.Turno;
 
 /**

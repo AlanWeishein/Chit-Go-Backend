@@ -1,7 +1,6 @@
 package com.chitgo.usuarios.dominio;
 
 import java.time.Instant;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -31,10 +30,6 @@ public class Local {
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(length = 36)
     private String tokenStaff;
-
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(length = 36)
-    private String tokenPantalla = UUID.randomUUID().toString();
 
     private short minutosInactividadSesion = 10;
 
@@ -71,8 +66,6 @@ public class Local {
     public String getTokenStaff() {
         return tokenStaff;
     }
-
-    public String getTokenPantalla() { return tokenPantalla; }
 
     public short getMinutosInactividadSesion() {
         return minutosInactividadSesion;

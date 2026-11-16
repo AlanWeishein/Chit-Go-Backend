@@ -9,6 +9,4 @@ import com.chitgo.usuarios.dominio.Local;
 interface LocalJpaRepository extends JpaRepository<Local, Long> {
 
     Optional<Local> findByTokenStaff(String tokenStaff);
-
-    Optional<Local> findByTokenPantalla(String tokenPantalla);
 }

@@ -23,7 +23,7 @@ import com.chitgo.usuarios.aplicacion.dto.AusenciaDto;
 import com.chitgo.usuarios.aplicacion.dto.DatosDeTurno;
 import com.chitgo.usuarios.aplicacion.dto.EmpleadoDetalleDto;
 import com.chitgo.usuarios.aplicacion.dto.EmpleadoResumenDto;
-import com.chitgo.compartido.aplicacion.PaginaDto;
+import com.chitgo.usuarios.aplicacion.dto.PaginaDto;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
 /**

@@ -24,7 +24,7 @@ import com.chitgo.usuarios.aplicacion.GestionarEmpleadosService;
 import com.chitgo.usuarios.dominio.Ausencia;
 import com.chitgo.usuarios.dominio.DiaSemana;
 import com.chitgo.usuarios.dominio.Empleado;
-import com.chitgo.compartido.dominio.PaginaDe;
+import com.chitgo.usuarios.dominio.PaginaDe;
 import com.chitgo.usuarios.dominio.Rol;
 import com.chitgo.usuarios.dominio.TipoAusencia;
 import com.chitgo.usuarios.dominio.Turno;
