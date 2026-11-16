@@ -1,6 +1,5 @@
 package com.chitgo.pedidos.infraestructura.persistencia;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -57,11 +56,6 @@ class PedidoRepositoryAdapter implements PedidoRepository {
     @Override
     public List<Pedido> listarDeLaCuenta(Long cuentaId) {
         return jpa.deLaCuenta(cuentaId);
-    }
-
-    @Override
-    public List<Pedido> listarDeLasCuentas(Collection<Long> cuentaIds) {
-        return jpa.deLasCuentas(cuentaIds);
     }
 
     @Override

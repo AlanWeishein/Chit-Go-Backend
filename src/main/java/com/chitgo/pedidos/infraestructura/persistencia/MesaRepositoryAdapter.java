@@ -1,7 +1,6 @@
 package com.chitgo.pedidos.infraestructura.persistencia;
 
 import java.util.Optional;
-import java.util.List;
 
 import org.springframework.stereotype.Repository;
 
@@ -25,10 +24,5 @@ class MesaRepositoryAdapter implements MesaRepository {
     @Override
     public Optional<Mesa> buscarPorTokenQrParaAbrirCuenta(String tokenQr) {
         return jpa.buscarParaAbrirCuenta(tokenQr);
-    }
-
-    @Override
-    public List<Mesa> listarDelLocal(Long localId) {
-        return jpa.findByLocalIdOrderByNumeroAscIdAsc(localId);
     }
 }

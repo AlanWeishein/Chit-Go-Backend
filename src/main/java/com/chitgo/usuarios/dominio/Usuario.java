@@ -1,7 +1,6 @@
 package com.chitgo.usuarios.dominio;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,6 +18,9 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "usuario")
 public class Usuario {
+
+    /** RNF-07: a los 5 intentos fallidos seguidos queda bloqueado. */
+    public static final int INTENTOS_PARA_BLOQUEAR = 5;
 
     /**
      * El bloqueo por intentos no vence solo: dura hasta que el Admin blanquea el PIN (HU-14), que pone
@@ -54,11 +56,6 @@ public class Usuario {
     private boolean debeCambiarCredencial = true;
 
     private boolean activo = true;
-
-    private boolean contrasenaProvisoria = false;
-
-    /** Lo pone el logout: los tokens emitidos antes ya no sirven (decidido el 20/10, punto 7). NULL vale todo. */
-    private Instant sesionValidaDesde;
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -125,49 +122,18 @@ public class Usuario {
         return activo;
     }
 
-    /** El mozo todavía no eligió la contraseña que le puso el Admin (HU-14, decidido el 20/10). */
-    public boolean isContrasenaProvisoria() {
-        return contrasenaProvisoria;
-    }
-
     public Instant getCreadoEn() {
         return creadoEn;
-    }
-
-    public Instant getSesionValidaDesde() {
-        return sesionValidaDesde;
-    }
-
-    /**
-     * El logout (CP-13-01): desde este segundo, los tokens emitidos antes dan 401, en todos los dispositivos del
-     * usuario. Se guarda truncado al segundo, como el iat del token: si no, MySQL redondea la fracción hacia
-     * arriba y el login que viene enseguida, en el mismo segundo, tampoco serviría.
-     */
-    public void cerrarSesiones(Instant ahora) {
-        sesionValidaDesde = ahora.truncatedTo(ChronoUnit.SECONDS);
-    }
-
-    /**
-     * Si un token emitido en {@code emitidoEn} (el iat, en segundos) sigue valiendo. Un token del mismo segundo
-     * del logout pasa, para que el que vuelve a entrar enseguida no quede afuera; es una ventana de un segundo
-     * también para uno de antes del logout.
-     */
-    public boolean aceptaSesionEmitidaEn(Instant emitidoEn) {
-        return sesionValidaDesde == null || !emitidoEn.isBefore(sesionValidaDesde);
     }
 
     public boolean estaBloqueado(Instant ahora) {
         return bloqueadoHasta != null && ahora.isBefore(bloqueadoHasta);
     }
 
-    /**
-     * Un intento fallido más. Al llegar a {@code intentosParaBloquear} seguidos queda bloqueado sin vencimiento
-     * (RNF-07). El número lo pasa el service, que lo lee de {@code chitgo.reglas.intentos-para-bloquear}: 5 por
-     * defecto. Va por parámetro porque una entidad no recibe propiedades de Spring.
-     */
-    public void registrarIntentoFallido(int intentosParaBloquear) {
+    /** Un intento fallido más. Al quinto seguido queda bloqueado sin vencimiento. */
+    public void registrarIntentoFallido() {
         intentosFallidos++;
-        if (intentosFallidos >= intentosParaBloquear) {
+        if (intentosFallidos >= INTENTOS_PARA_BLOQUEAR) {
             bloqueadoHasta = BLOQUEO_SIN_VENCIMIENTO;
         }
     }
@@ -175,7 +141,7 @@ public class Usuario {
     /**
      * Eligió su credencial en el primer ingreso o después de un blanqueo (CU-12): se guarda y la marca de
      * cambio obligatorio se apaga. Un hash NULL deja el que tenía, como la contraseña del mozo que solo eligió
-     * el PIN. Con una contraseña nueva, la provisoria también queda atrás.
+     * el PIN.
      */
     public void elegirCredencial(String nuevoPinHash, String nuevoHashPassword) {
         if (nuevoPinHash != null) {
@@ -183,48 +149,8 @@ public class Usuario {
         }
         if (nuevoHashPassword != null) {
             hashPassword = nuevoHashPassword;
-            contrasenaProvisoria = false;
         }
         debeCambiarCredencial = false;
-    }
-
-    /**
-     * El Admin le blanquea el PIN (HU-14, CP-10-06): el nuevo es provisorio, los intentos vuelven a 0 y se levanta
-     * el bloqueo. La contraseña provisoria queda como estaba: un blanqueo de PIN no le vuelve a pedir la
-     * contraseña al mozo.
-     */
-    public void blanquearPin(String nuevoPinHash) {
-        pinHash = nuevoPinHash;
-        intentosFallidos = 0;
-        bloqueadoHasta = null;
-        debeCambiarCredencial = true;
-    }
-
-    /**
-     * Alta de un empleado (HU-14): las credenciales las puso el Admin, así que son provisorias. Solo el mozo
-     * tiene contraseña provisoria.
-     */
-    public static Usuario nuevoEmpleado(Long localId, Rol rol, String nombre, String nombreUsuario,
-            String hashPassword, String pinHash) {
-        Usuario usuario = new Usuario(localId, rol, nombre, nombreUsuario, null, hashPassword, pinHash);
-        usuario.debeCambiarCredencial = true;
-        usuario.contrasenaProvisoria = rol.esMozo();
-        return usuario;
-    }
-
-    /** Cambia el nombre y, si es mozo, su usuario. El rol y las credenciales no se tocan. */
-    public void renombrar(String nuevoNombre, String nuevoNombreUsuario) {
-        nombre = nuevoNombre;
-        nombreUsuario = nuevoNombreUsuario;
-    }
-
-    /** Baja lógica. Devuelve false si ya estaba dado de baja, para que darlo de baja dos veces no cambie nada. */
-    public boolean darDeBaja() {
-        if (!activo) {
-            return false;
-        }
-        activo = false;
-        return true;
     }
 
     /** Entró con la credencial correcta: los intentos vuelven a 0. */

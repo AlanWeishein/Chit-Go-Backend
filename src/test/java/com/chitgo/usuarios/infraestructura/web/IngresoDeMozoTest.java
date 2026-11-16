@@ -210,39 +210,6 @@ class IngresoDeMozoTest {
     }
 
     @Test
-    void unMozoBloqueadoSinCookieConLaContrasenaCorrectaVeElBloqueo() throws Exception {
-        // CP-10-12: el 423 sale solo a quien sabe la contraseña. No deja la cookie ni cambia los intentos.
-        Long juan = idDe("Juan", "La Esquina");
-        bloquear(juan);
-
-        habilitar(TOKEN_LA_ESQUINA, "juan", CONTRASENA)
-                .andExpect(status().isLocked())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.detail").value(BLOQUEADO))
-                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
-
-        assertThat(intentos(juan)).isEqualTo(5);
-    }
-
-    @Test
-    void unMozoBloqueadoConLaContrasenaIncorrectaRecibeElMensajeGenerico() throws Exception {
-        // CP-10-12: con la incorrecta, el mismo cuerpo que un usuario que no existe, y no suma intentos.
-        Long juan = idDe("Juan", "La Esquina");
-        bloquear(juan);
-
-        String bloqueadoConLaIncorrecta = habilitar(TOKEN_LA_ESQUINA, "juan", "otraContrasena")
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.detail").value(INCORRECTOS))
-                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
-                .andReturn().getResponse().getContentAsString();
-        String usuarioQueNoExiste = habilitar(TOKEN_LA_ESQUINA, "nadie", "otraContrasena")
-                .andReturn().getResponse().getContentAsString();
-
-        assertThat(json.readTree(bloqueadoConLaIncorrecta)).isEqualTo(json.readTree(usuarioQueNoExiste));
-        assertThat(intentos(juan)).isEqualTo(5);
-    }
-
-    @Test
     void conLaContrasenaIncorrectaSumaUnIntento() throws Exception {
         Long juan = idDe("Juan", "La Esquina");
 
@@ -286,10 +253,9 @@ class IngresoDeMozoTest {
         habilitar(TOKEN_LA_ESQUINA, "juan", "otraContrasena")
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value(INCORRECTOS));
-        // Con la correcta ya no entra, pero se entera de que está bloqueado (B', decidido el 20/10, punto 4).
         habilitar(TOKEN_LA_ESQUINA, "juan", CONTRASENA)
-                .andExpect(status().isLocked())
-                .andExpect(jsonPath("$.detail").value(BLOQUEADO))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value(INCORRECTOS))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
 
         assertThat(intentos(juan)).isEqualTo(5);
@@ -448,12 +414,6 @@ class IngresoDeMozoTest {
 
     private int intentos(Long usuarioId) {
         return jdbc.queryForObject("SELECT intentos_fallidos FROM usuario WHERE id = ?", Integer.class, usuarioId);
-    }
-
-    /** Como lo deja el quinto intento fallido. */
-    private void bloquear(Long usuarioId) {
-        jdbc.update("UPDATE usuario SET intentos_fallidos = 5, bloqueado_hasta = ? WHERE id = ?",
-                Timestamp.from(Usuario.BLOQUEO_SIN_VENCIMIENTO), usuarioId);
     }
 
     private record PedidoDeMozo(String tokenStaff, String nombreUsuario, String password) {
