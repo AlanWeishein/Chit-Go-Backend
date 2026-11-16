@@ -2,7 +2,6 @@ package com.chitgo.pedidos.infraestructura.websocket;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -17,11 +16,9 @@ import com.chitgo.pedidos.dominio.puertos.PublicadorDeEventos;
 public class PublicadorStomp implements PublicadorDeEventos {
 
     private final SimpMessagingTemplate plantilla;
-    private final ApplicationEventPublisher eventos;
 
-    public PublicadorStomp(SimpMessagingTemplate plantilla, ApplicationEventPublisher eventos) {
+    public PublicadorStomp(SimpMessagingTemplate plantilla) {
         this.plantilla = plantilla;
-        this.eventos = eventos;
     }
 
     @Override
@@ -37,10 +34,6 @@ public class PublicadorStomp implements PublicadorDeEventos {
     @Override
     public void aMozos(Long localId, EventoTiempoReal evento) {
         enviar(topic(localId, "mozo/avisos"), evento);
-        if (evento.tipo() == com.chitgo.pedidos.dominio.TipoEvento.AVISO_CREADO
-                || evento.tipo() == com.chitgo.pedidos.dominio.TipoEvento.PEDIDO_LISTO) {
-            eventos.publishEvent(new AvisoParaPush(localId, evento));
-        }
     }
 
     @Override
@@ -50,15 +43,8 @@ public class PublicadorStomp implements PublicadorDeEventos {
 
     @Override
     public void aPantalla(Long localId, EventoTiempoReal evento) {
-        // La pantalla no recibe mensajes internos, motivos ni datos de la cuenta.
-        if (evento.pedidoId() != null && java.util.Set.of("EN_PREPARACION", "LISTO", "SERVIDO", "CANCELADO")
-                .contains(evento.estado() == null ? "" : evento.estado())) {
-            EventoDePantalla publico = new EventoDePantalla(evento.tipo(), evento.pedidoId(), evento.estado(), evento.ocurridoEn());
-            despuesDelCommit(() -> plantilla.convertAndSend(topic(localId, "pantalla"), publico));
-        }
+        enviar(topic(localId, "pantalla"), evento);
     }
-
-    public record EventoDePantalla(com.chitgo.pedidos.dominio.TipoEvento tipo, Long pedidoId, String estado, String ocurridoEn) { }
 
     @Override
     public void aCliente(String tokenSesion, EventoTiempoReal evento) {

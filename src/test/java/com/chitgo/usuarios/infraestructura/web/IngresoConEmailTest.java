@@ -192,18 +192,18 @@ class IngresoConEmailTest {
     }
 
     @Test
-    void unaInyeccionSqlEnElEmailSeRechazaComoDatoInvalido() throws Exception {
-        // RNF-15: el formato inválido ahora se rechaza antes de autenticar.
+    void unaInyeccionSqlEnElEmailDaElMensajeGenerico() throws Exception {
+        // CP-11-07 (RNF-15)
         for (String email : new String[] {"' OR '1'='1' --", ADMIN + "' -- ", "' OR 1=1; DROP TABLE usuario; --"}) {
             ingresar(email, "cualquierCosa")
-                    .andExpect(status().isBadRequest())
+                    .andExpect(status().isUnauthorized())
                     .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                    .andExpect(jsonPath("$.detail").value("Los datos enviados no son válidos."))
+                    .andExpect(jsonPath("$.detail").value(INCORRECTOS))
                     .andExpect(content().string(not(containsStringIgnoringCase("sql"))))
                     .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
         }
 
-        // No le sumó un intento a nadie ni se modificó la tabla de usuarios.
+        // No le sumó un intento a nadie: la consulta no encontró ningún usuario.
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM usuario WHERE intentos_fallidos > 0", Integer.class))
                 .isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM usuario", Integer.class)).isPositive();
@@ -224,40 +224,7 @@ class IngresoConEmailTest {
     @Test
     void sinEmailDa400() throws Exception {
         ingresar("", CONTRASENA).andExpect(status().isBadRequest());
-        ingresar(null, CONTRASENA).andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void unEmailSinFormatoValidoDa400SinCrearSesion() throws Exception {
-        for (String email : new String[] {"no-es-un-email", "admin@", "admin@@laesquina.test", "admin@dominio..test"}) {
-            ingresar(email, CONTRASENA)
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                    .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
-        }
-        assertThat(intentos(ADMIN)).isZero();
-    }
-
-    @Test
-    void unEmailDe160CaracteresPasaLaValidacionYUnoDe161No() throws Exception {
-        String email = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(31);
-        assertThat(email).hasSize(160);
-        // Tiene formato válido pero no existe: llega a autenticar y devuelve el 401 genérico.
-        ingresar(email, CONTRASENA).andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.detail").value(INCORRECTOS));
-        ingresar(email + "c", CONTRASENA).andExpect(status().isBadRequest())
-                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
-    }
-
-    @Test
-    void pegarTextoGiganteAlEmailDa400SinCrearSesionNiSumarIntentos() throws Exception {
-        for (String email : new String[] {ADMIN + "texto".repeat(20_000), ADMIN + " ".repeat(100_000)}) {
-            ingresar(email, CONTRASENA)
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.detail").value("Los datos enviados no son válidos."))
-                    .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
-        }
-        assertThat(intentos(ADMIN)).isZero();
+        ingresar("a".repeat(161), CONTRASENA).andExpect(status().isBadRequest());
     }
 
     private ResultActions ingresar(String email, String password) throws Exception {

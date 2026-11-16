@@ -1,6 +1,5 @@
 package com.chitgo.usuarios.aplicacion;
 
-import java.time.Instant;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -31,17 +30,11 @@ public class RenovarSesionService {
         this.apertura = apertura;
     }
 
-    /**
-     * @param emitidoEn el iat del token que vino: si es de antes del último logout, no se renueva (CP-13-01). Se
-     *                  compara acá con el usuario que ya se carga, así no suma una consulta.
-     * @return el token nuevo, o vacío si el usuario ya no existe, está dado de baja o cerró la sesión después de
-     *         emitido ese token: ahí se corta la sesión
-     */
+    /** @return el token nuevo, o vacío si el usuario ya no existe o está dado de baja: ahí se corta la sesión */
     @Transactional(readOnly = true)
-    public Optional<ResultadoDeIngreso> renovar(Long usuarioId, Instant emitidoEn) {
+    public Optional<ResultadoDeIngreso> renovar(Long usuarioId) {
         return usuarios.buscarPorId(usuarioId)
                 .filter(Usuario::isActivo)
-                .filter(usuario -> usuario.aceptaSesionEmitidaEn(emitidoEn))
                 .map(usuario -> apertura.abrir(usuario, localDe(usuario)));
     }
 

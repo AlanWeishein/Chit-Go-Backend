@@ -5,7 +5,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.usuarios.dominio.CredencialesIncorrectasException;
 import com.chitgo.usuarios.dominio.Local;
@@ -26,7 +25,6 @@ public class IngresarConEmailService {
     private final CodificadorDeClaves codificador;
     private final AperturaDeSesion apertura;
     private final Reloj reloj;
-    private final ReglasDelNegocio reglas;
 
     /**
      * Contra este hash se verifica la contraseña cuando no hay un usuario que pueda entrar, para que la
@@ -35,13 +33,12 @@ public class IngresarConEmailService {
     private final String hashDeRelleno;
 
     IngresarConEmailService(UsuarioRepository usuarios, LocalRepository locales, CodificadorDeClaves codificador,
-            AperturaDeSesion apertura, Reloj reloj, ReglasDelNegocio reglas) {
+            AperturaDeSesion apertura, Reloj reloj) {
         this.usuarios = usuarios;
         this.locales = locales;
         this.codificador = codificador;
         this.apertura = apertura;
         this.reloj = reloj;
-        this.reglas = reglas;
         this.hashDeRelleno = codificador.hashear(UUID.randomUUID().toString());
     }
 
@@ -72,7 +69,7 @@ public class IngresarConEmailService {
             throw new CredencialesIncorrectasException();
         }
         if (!coincide) {
-            usuario.registrarIntentoFallido(reglas.intentosParaBloquear());
+            usuario.registrarIntentoFallido();
             throw new CredencialesIncorrectasException();
         }
         usuario.registrarIngreso();

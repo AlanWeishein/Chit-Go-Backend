@@ -5,7 +5,6 @@ import java.time.Instant;
 
 import org.springframework.stereotype.Component;
 
-import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.usuarios.aplicacion.dto.SesionDto;
 import com.chitgo.usuarios.aplicacion.dto.SesionDto.LocalDeSesionDto;
 import com.chitgo.usuarios.dominio.DatosDeSesion;
@@ -20,17 +19,21 @@ import com.chitgo.usuarios.dominio.puertos.EmisorDeTokens;
 @Component
 class AperturaDeSesion {
 
-    private final EmisorDeTokens emisor;
-    private final ReglasDelNegocio reglas;
+    /** Caja se corta a la hora (09/10), con el aviso a los 55 minutos en el front. No la configura el Admin. */
+    static final Duration DURACION_CAJA = Duration.ofHours(1);
 
-    AperturaDeSesion(EmisorDeTokens emisor, ReglasDelNegocio reglas) {
+    /** El Gerente/Dueño no tiene local, y por lo tanto no tiene el T que configura el Admin. */
+    static final Duration DURACION_SIN_LOCAL = Duration.ofMinutes(10);
+
+    private final EmisorDeTokens emisor;
+
+    AperturaDeSesion(EmisorDeTokens emisor) {
         this.emisor = emisor;
-        this.reglas = reglas;
     }
 
     /** @param local NULL para el Gerente/Dueño */
     ResultadoDeIngreso abrir(Usuario usuario, Local local) {
-        Duration duracion = duracionPara(usuario, local, reglas);
+        Duration duracion = duracionPara(usuario, local);
         Long localId = local != null ? local.getId() : null;
         DatosDeSesion datos = new DatosDeSesion(usuario.getId(), usuario.getRol().getCodigo(), localId,
                 usuario.isDebeCambiarCredencial());
@@ -40,19 +43,15 @@ class AperturaDeSesion {
         Instant expiraEn = emisor.leer(token).expiraEn();
         LocalDeSesionDto localDto = local != null ? new LocalDeSesionDto(local.getId(), local.getNombre()) : null;
         SesionDto sesion = new SesionDto(usuario.getId(), usuario.getNombre(), datos.rol(), localDto,
-                datos.debeCambiarCredencial(), usuario.isContrasenaProvisoria(), expiraEn);
+                datos.debeCambiarCredencial(), expiraEn);
         return new ResultadoDeIngreso(token, duracion, sesion);
     }
 
-    /**
-     * El T según el rol. Caja, {@code sesion-de-caja} (una hora por defecto, 09/10), que no la configura el Admin.
-     * El resto, el del local (10 por defecto, en la base). El Gerente/Dueño no tiene local, y por lo tanto no
-     * tiene el T que configura el Admin: {@code sesion-sin-local} (10 minutos por defecto).
-     */
-    static Duration duracionPara(Usuario usuario, Local local, ReglasDelNegocio reglas) {
+    /** El T según el rol: Caja, una hora; el resto, el del local (10 por defecto); el Gerente/Dueño, 10. */
+    static Duration duracionPara(Usuario usuario, Local local) {
         if (usuario.getRol().esCaja()) {
-            return reglas.sesionDeCaja();
+            return DURACION_CAJA;
         }
-        return local != null ? Duration.ofMinutes(local.getMinutosInactividadSesion()) : reglas.sesionSinLocal();
+        return local != null ? Duration.ofMinutes(local.getMinutosInactividadSesion()) : DURACION_SIN_LOCAL;
     }
 }

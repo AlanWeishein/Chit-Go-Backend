@@ -51,7 +51,6 @@ public class SecurityConfig {
 
         RequestMatcher publicas = new OrRequestMatcher(
                 pathPattern("/api/v1/ping"), pathPattern("/api/v1/public/**"),
-                pathPattern(HttpMethod.GET, "/api/v1/pantalla/*/pedidos-en-curso"),
                 // El handshake es publico; STOMP autentica el CONNECT.
                 pathPattern("/ws/**"),
                 pathPattern(HttpMethod.POST, "/api/v1/auth/pin"),

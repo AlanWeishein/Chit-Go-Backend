@@ -42,11 +42,8 @@ class PrimerIngresoTest {
 
     private static final String CREDENCIAL = "/api/v1/auth/credencial";
     private static final String SESION = "/api/v1/auth/sesion";
-    /**
-     * No existe ni va a existir: con sesión da 404, y con la credencial provisoria, 403 antes de llegar a buscarla.
-     * Antes era /mozo/mesas, hasta que el Sprint 2 la implementó.
-     */
-    private static final String OTRA_RUTA = "/api/v1/ruta-de-prueba-que-no-existe";
+    /** No existe todavía: con sesión da 404, y con la credencial provisoria, 403 antes de llegar a buscarla. */
+    private static final String OTRA_RUTA = "/api/v1/mozo/mesas";
     private static final String TOKEN_LA_ESQUINA = "83f39b25-deac-4fde-80cc-4cfdf8117713";
     private static final String CONTRASENA = "Chitgo2026!";
     private static final String CONTRASENA_NUEVA = "MiClaveNueva1";
@@ -76,10 +73,9 @@ class PrimerIngresoTest {
             jdbc.update("UPDATE usuario SET pin_hash = ?, hash_password = ? WHERE id = ?",
                     fila.get("pin_hash"), fila.get("hash_password"), fila.get("id"));
         }
-        // El logout de un test deja el "válido desde" (ST-23, tarea 3).
         jdbc.update("""
                 UPDATE usuario SET debe_cambiar_credencial = FALSE, intentos_fallidos = 0, bloqueado_hasta = NULL,
-                activo = TRUE, sesion_valida_desde = NULL""");
+                activo = TRUE""");
     }
 
     // --- Lo que puede hacer con la credencial provisoria

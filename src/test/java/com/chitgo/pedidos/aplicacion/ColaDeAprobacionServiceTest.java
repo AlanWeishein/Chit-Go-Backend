@@ -12,7 +12,6 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.chitgo.compartido.aplicacion.ReglasDePrueba;
 import com.chitgo.compartido.dominio.AccesoDenegadoException;
 import com.chitgo.compartido.dominio.RelojDePrueba;
 import com.chitgo.compartido.dominio.SolicitudInvalidaException;
@@ -38,7 +37,7 @@ class ColaDeAprobacionServiceTest {
         localesPedidos.add(localId);
         return pendientes;
     };
-    private final ColaDeAprobacionService servicio = new ColaDeAprobacionService(puerto, reloj, ReglasDePrueba.DE_HOY);
+    private final ColaDeAprobacionService servicio = new ColaDeAprobacionService(puerto, reloj);
 
     private static PedidoPorAprobar pedido(long id, String hora, ItemPorAprobar... items) {
         return new PedidoPorAprobar(id, "1", Instant.parse("2026-10-20T" + hora + "Z"), List.of(items));

@@ -26,10 +26,7 @@ public class ConsultarSesionService {
         this.locales = locales;
     }
 
-    /**
-     * El rol, debeCambiarCredencial y el vencimiento salen del token; el nombre, el local y contrasenaProvisoria, de
-     * la base.
-     */
+    /** El rol, debeCambiarCredencial y el vencimiento salen del token; el nombre y el local, de la base. */
     @Transactional(readOnly = true)
     public SesionDto consultar(UsuarioAutenticado sesion) {
         Usuario usuario = usuarios.buscarPorId(sesion.usuarioId())
@@ -44,6 +41,6 @@ public class ConsultarSesionService {
         }
 
         return new SesionDto(usuario.getId(), usuario.getNombre(), sesion.rol(), local,
-                sesion.debeCambiarCredencial(), usuario.isContrasenaProvisoria(), sesion.expiraEn());
+                sesion.debeCambiarCredencial(), sesion.expiraEn());
     }
 }
