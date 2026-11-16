@@ -153,6 +153,18 @@ encabezado del SQL.
   - 400: falta un dato, el email no tiene formato válido o supera 160 caracteres (incluidos los espacios
     pegados al borde), o la contraseña no tiene de 8 a 64 caracteres o pasa de 72 bytes (con acentos o
     emojis cada carácter ocupa más de uno). No suma intentos.
+  - 429: se admiten hasta **3 solicitudes por origen y email en una ventana móvil de 60 segundos**,
+    contando también los ingresos exitosos. Se aplica después de CSRF y validación, antes de autenticar.
+    Devuelve ProblemDetail y `Retry-After` en segundos; no crea sesión ni suma intentos fallidos.
+    Emails equivalentes según la colación de MySQL comparten cupo aunque cambien mayúsculas o acentos.
+    No hay un cupo global de solicitudes por IP: otras cuentas bajo la misma NAT tienen cupos propios.
+    Al vencer la ventana se puede reintentar; RNF-07 conserva el bloqueo por cinco fallos admitidos.
+- Parámetros: `chitgo.seguridad.login-email.solicitudes` (3), `ventana` (60s) y `maximo-de-claves` (10000).
+  El cupo debe ser menor que `chitgo.reglas.intentos-para-bloquear`; valores incompatibles impiden arrancar.
+  La memoria es local y acotada: si se llena, las claves nuevas reciben 429 hasta liberarse espacio.
+  El origen es la dirección de la conexión; se ignoran los headers de proxy del cliente con
+  `server.forward-headers-strategy: none`. Un despliegue detrás de un proxy requiere revisar esa política.
+  Alcance, evidencia y limitaciones en [Seguridad del login](docs/seguridad-account-lockout.md).
 
 ### Primer ingreso (P-29, P-30, P-31 y P-32b)
 
