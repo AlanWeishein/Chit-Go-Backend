@@ -911,6 +911,60 @@ escuchan los dos (`pedido.aprobar_rechazar` o `empleado.gestionar`), de dos mane
 - Lo prueban `MesaSinMozoTest` (CP-07-05, CP-01-09 y el `GET`, contra el MySQL del Compose), `MozoDeTurnoAdapterTest`
   (los turnos que cruzan la medianoche) y `AlertaDeMesaSinMozoProgramadaTest` (que quede agendada cada minuto).
 
+## Gerente/Dueño (para el front)
+
+HU-16 (RF-29), pantalla P-19. El Gerente/Dueño no opera: administra a los Admin de su local y mira los reportes y
+la auditoría, solo lectura. Su sesión no tiene local (`local: null`), así que **ninguna ruta necesita `localId`**: el
+local es el que lo tiene como propietario (`local.propietario_usuario_id`). Un Gerente/Dueño tiene un solo local en
+el MVP 1. Sin sesión dan 401. Los `POST` y `PATCH` llevan `X-XSRF-TOKEN` (ver "Sesión y CSRF"); sin él, 403. Los
+errores salen en ProblemDetail y el `detail` se puede mostrar tal cual.
+
+### Admins del local
+
+Piden el permiso `admin.gestionar`: el Admin, Carla y Juan reciben 403 (CP-31-05).
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /api/v1/gerente/admins` | Los Admin del local, por nombre, **también los dados de baja**: `[{id, nombre, email, activo, bloqueado}]`. Sin paginado |
+| `POST /api/v1/gerente/admins` | `{nombre, email, password}`. Responde 201 con el Admin. Queda con `debe_cambiar_credencial` en TRUE: entra con esa contraseña y solo puede usar `/auth/credencial` hasta elegir la suya. Puede haber varios |
+| `PATCH /api/v1/gerente/admins/{id}/activo` | `{activo}`. Baja o reactivación, 200 con el Admin. No borra nada. Repetir el mismo estado responde lo mismo |
+| `POST /api/v1/gerente/admins/{id}/desbloquear` | Vuelve los intentos a 0 y levanta el bloqueo. 200 con el Admin. Si no estaba bloqueado, también 200 y no cambia nada |
+
+- **409** "Ya hay un usuario con ese email" al crear, aunque el email sea de otro local y sin distinguir mayúsculas.
+- **409** "El Admin está dado de baja" al desbloquear a uno dado de baja: primero se lo reactiva.
+- **404** "El Admin no existe" para un id que no es un Admin del local (otro rol, otro local o inexistente), siempre
+  el mismo texto. Sin local propio, 404 "El local no existe".
+- **400** con el campo marcado si falta el nombre, el email o la contraseña, o si el formato no sirve (email válido de
+  hasta 160 caracteres; contraseña de 8 a 64 caracteres y hasta 72 bytes).
+- Cada cambio queda en la auditoría, entidad `USUARIO`: `CREAR_ADMIN`, `BAJA_ADMIN`, `REACTIVAR_ADMIN` y
+  `DESBLOQUEAR_ADMIN`, con el local del Admin y el Gerente/Dueño como autor. Nunca va la contraseña ni su hash.
+
+### Reportes y auditoría (solo lectura)
+
+Piden `reporte.ver` y `auditoria.ver`, y **además ser Gerente/Dueño**: el Admin, Carla y Juan reciben 403
+"Esta acción es del Gerente/Dueño", aunque tengan el permiso (ellos usan `/admin/...`). No hay ninguna ruta para
+cambiar nada.
+
+| Ruta | Parámetros |
+|---|---|
+| `GET /api/v1/gerente/reportes/ventas` | `desde`, `hasta` (obligatorios), `page`, `size` |
+| `GET /api/v1/gerente/reportes/tiempos-preparacion` | los mismos |
+| `GET /api/v1/gerente/reportes/platos-mas-pedidos` | los mismos |
+| `GET /api/v1/gerente/auditoria` | `entidad`, `accion`, `usuarioId`, `desde`, `hasta`, `page`, `size` (todos opcionales) |
+
+- Mismos parámetros, validaciones y respuesta que `/admin/reportes/*` y `/admin/auditoria` (HU-15): usan los mismos
+  Services. El paginado es el de siempre (`contenido`, `page`, `size`, `totalElementos`, `totalPaginas`).
+- `localId` es **opcional y no hace falta**. Si el front lo manda y no es el del Gerente/Dueño, 404 "El local no
+  existe", el mismo texto que cuando no tiene local. Nunca se ve el local de otro.
+- El Gerente/Dueño también entra a `/admin/reportes` y `/admin/auditoria`, pero ahí **sí** tiene que mandar
+  `localId`; el front no lo necesita.
+
+### Cómo se prueba
+
+- `AdminsDelGerenteTest` (CP-31-01 a CP-31-05, el desbloqueo y el aislamiento entre locales), `ReportesDelGerenteTest` y
+  `LocalDelGerenteServiceTest` (CP-28-06, los reportes y la auditoría), contra el MySQL del Compose y con el login de verdad
+  (`dueno@laesquina.test`, `dueno@elpuerto.test`, `Chitgo2026!`).
+
 ## Sprint 2: tareas de German
 
 Implementados HU-03 (llamados y cuenta), HU-05 (mesas, avisos, servido y Web Push), prioridad manual de

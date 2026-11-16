@@ -10,7 +10,7 @@ import com.chitgo.compartido.aplicacion.PaginaDto;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
 @RestController
-@RequestMapping({"/api/v1/admin/auditoria", "/api/v1/gerente/auditoria"})
+@RequestMapping("/api/v1/admin/auditoria")
 @PreAuthorize("hasAuthority('auditoria.ver')")
 public class AuditoriaController {
     private final ConsultarAuditoriaService auditoria;
