@@ -30,4 +30,9 @@ class LocalRepositoryAdapter implements LocalRepository {
     public Optional<Local> buscarPorTokenPantalla(String tokenPantalla) {
         return jpa.findByTokenPantalla(tokenPantalla);
     }
+
+    @Override
+    public Optional<Local> buscarPorPropietario(Long usuarioId) {
+        return jpa.findFirstByPropietarioUsuarioIdOrderByIdAsc(usuarioId);
+    }
 }

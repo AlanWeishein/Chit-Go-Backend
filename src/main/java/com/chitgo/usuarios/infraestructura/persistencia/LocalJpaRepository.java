@@ -11,4 +11,6 @@ interface LocalJpaRepository extends JpaRepository<Local, Long> {
     Optional<Local> findByTokenStaff(String tokenStaff);
 
     Optional<Local> findByTokenPantalla(String tokenPantalla);
+
+    Optional<Local> findFirstByPropietarioUsuarioIdOrderByIdAsc(Long propietarioUsuarioId);
 }

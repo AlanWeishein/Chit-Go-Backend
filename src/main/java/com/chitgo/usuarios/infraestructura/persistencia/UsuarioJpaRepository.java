@@ -51,4 +51,11 @@ interface UsuarioJpaRepository extends JpaRepository<Usuario, Long> {
             """)
     boolean tieneAusenciaVigente(@Param("usuarioId") Long usuarioId, @Param("localId") Long localId,
             @Param("hoy") LocalDate hoy);
+
+    @Query("SELECT u FROM Usuario u WHERE u.localId = :localId AND u.rol.codigo = 'ADMIN' "
+            + "ORDER BY u.nombre ASC, u.id ASC")
+    List<Usuario> listarAdmins(@Param("localId") Long localId);
+
+    @Query("SELECT COUNT(u) > 0 FROM Usuario u WHERE LOWER(u.email) = LOWER(:email)")
+    boolean existeEmail(@Param("email") String email);
 }

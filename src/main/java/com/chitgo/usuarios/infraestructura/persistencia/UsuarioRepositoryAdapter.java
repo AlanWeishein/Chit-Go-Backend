@@ -71,4 +71,31 @@ class UsuarioRepositoryAdapter implements UsuarioRepository {
     public boolean tieneAusenciaVigente(Long usuarioId, Long localId, LocalDate hoy) {
         return jpa.tieneAusenciaVigente(usuarioId, localId, hoy);
     }
+
+    @Override
+    public List<Usuario> listarAdminsDelLocal(Long localId) {
+        return jpa.listarAdmins(localId);
+    }
+
+    /** Bloquea solo la fila del usuario y después mira el local y el rol, así el FOR UPDATE no toma la fila del rol. */
+    @Override
+    public Optional<Usuario> buscarAdminParaModificar(Long id, Long localId) {
+        return jpa.buscarConBloqueo(id)
+                .filter(u -> localId.equals(u.getLocalId()) && "ADMIN".equals(u.getRol().getCodigo()));
+    }
+
+    @Override
+    public boolean existeEmail(String email) {
+        return jpa.existeEmail(email);
+    }
+
+    /** Con flush, como {@link #guardar}: si dos altas con el mismo email llegan juntas, la segunda también da el 409. */
+    @Override
+    public Usuario guardarConEmail(Usuario usuario) {
+        try {
+            return jpa.saveAndFlush(usuario);
+        } catch (DataIntegrityViolationException e) {
+            throw new ReglaDeNegocioException("Ya hay un usuario con ese email");
+        }
+    }
 }

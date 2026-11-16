@@ -12,4 +12,10 @@ public interface LocalRepository {
     Optional<Local> buscarPorTokenStaff(String tokenStaff);
 
     Optional<Local> buscarPorTokenPantalla(String tokenPantalla);
+
+    /**
+     * El local del que es propietario el Gerente/Dueño (HU-16). En el MVP 1 tiene uno solo (10/10); si algún día
+     * tiene varios, devuelve el de id más bajo, y eso hay que revisarlo en el MVP 2.
+     */
+    Optional<Local> buscarPorPropietario(Long usuarioId);
 }
