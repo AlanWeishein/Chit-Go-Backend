@@ -11,6 +11,7 @@ import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.usuarios.dominio.DispositivoHabilitado;
 import com.chitgo.usuarios.dominio.TokenInvalidoException;
@@ -28,11 +29,14 @@ public class EmisorDeHabilitacionesJwt implements EmisorDeHabilitaciones {
 
     private final SecretKey clave;
     private final Reloj reloj;
+    private final ReglasDelNegocio reglas;
 
     /** @param claveBase64 la variable JWT_CLAVE, la misma del token de sesión */
-    public EmisorDeHabilitacionesJwt(@Value("${chitgo.jwt.clave:}") String claveBase64, Reloj reloj) {
+    public EmisorDeHabilitacionesJwt(@Value("${chitgo.jwt.clave:}") String claveBase64, Reloj reloj,
+                                     ReglasDelNegocio reglas) {
         this.clave = EmisorDeTokensJwt.armarClave(claveBase64);
         this.reloj = reloj;
+        this.reglas = reglas;
     }
 
     @Override
@@ -42,7 +46,7 @@ public class EmisorDeHabilitacionesJwt implements EmisorDeHabilitaciones {
                 .subject(usuarioId.toString())
                 .audience().add(AUDIENCIA).and()
                 .issuedAt(Date.from(ahora))
-                .expiration(Date.from(ahora.plus(DispositivoHabilitado.VIGENCIA)))
+                .expiration(Date.from(ahora.plus(reglas.vigenciaDelDispositivo())))
                 .signWith(clave, Jwts.SIG.HS256)
                 .compact();
     }

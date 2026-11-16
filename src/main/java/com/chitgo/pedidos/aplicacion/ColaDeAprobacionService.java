@@ -8,11 +8,13 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.chitgo.compartido.aplicacion.ReglasDelNegocio;
 import com.chitgo.compartido.dominio.AccesoDenegadoException;
 import com.chitgo.compartido.dominio.Reloj;
 import com.chitgo.compartido.dominio.SolicitudInvalidaException;
 import com.chitgo.pedidos.aplicacion.dto.ItemPorAprobarDto;
 import com.chitgo.pedidos.aplicacion.dto.PedidoPorAprobarDto;
+import com.chitgo.pedidos.dominio.Demora;
 import com.chitgo.pedidos.dominio.EstadoPedido;
 import com.chitgo.pedidos.dominio.puertos.PedidosPorAprobar;
 import com.chitgo.pedidos.dominio.puertos.PedidosPorAprobar.PedidoPorAprobar;
@@ -22,18 +24,17 @@ import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 @Service
 public class ColaDeAprobacionService {
 
-    /** Más de esto sin resolverse es demorado: a los 180 segundos todavía no, a los 181 sí (CP-20-01). */
-    static final long SEGUNDOS_HASTA_DEMORA = 180;
-
     private static final Comparator<PedidoPorAprobar> POR_LLEGADA =
             Comparator.comparing(PedidoPorAprobar::enviadoEn).thenComparing(PedidoPorAprobar::id);
 
     private final PedidosPorAprobar pedidosPorAprobar;
     private final Reloj reloj;
+    private final ReglasDelNegocio reglas;
 
-    public ColaDeAprobacionService(PedidosPorAprobar pedidosPorAprobar, Reloj reloj) {
+    public ColaDeAprobacionService(PedidosPorAprobar pedidosPorAprobar, Reloj reloj, ReglasDelNegocio reglas) {
         this.pedidosPorAprobar = pedidosPorAprobar;
         this.reloj = reloj;
+        this.reglas = reglas;
     }
 
     /** Los pendientes del local, del más viejo al más nuevo. Por ahora la cola es solo de PENDIENTE_APROBACION. */
@@ -58,10 +59,11 @@ public class ColaDeAprobacionService {
         return usuario.localId();
     }
 
-    private static PedidoPorAprobarDto aDto(PedidoPorAprobar p, Instant ahora) {
+    private PedidoPorAprobarDto aDto(PedidoPorAprobar p, Instant ahora) {
         // demorado sale de los mismos segundos que se muestran, así los dos campos nunca se contradicen.
         long segundos = Math.max(0, Duration.between(p.enviadoEn(), ahora).getSeconds());
-        return new PedidoPorAprobarDto(p.id(), p.mesa(), p.enviadoEn(), segundos, segundos > SEGUNDOS_HASTA_DEMORA,
+        return new PedidoPorAprobarDto(p.id(), p.mesa(), p.enviadoEn(), segundos,
+                Demora.estaDemorado(segundos, reglas.demoraDelPedido()),
                 p.items().stream()
                         .map(i -> new ItemPorAprobarDto(i.platoId(), i.plato(), i.cantidad(), i.observacion(),
                                 i.disponible()))

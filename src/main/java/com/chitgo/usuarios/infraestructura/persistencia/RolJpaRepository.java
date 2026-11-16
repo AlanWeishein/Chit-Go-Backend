@@ -1,6 +1,7 @@
 package com.chitgo.usuarios.infraestructura.persistencia;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -11,4 +12,6 @@ interface RolJpaRepository extends JpaRepository<Rol, Long> {
 
     @Query("SELECT DISTINCT r FROM Rol r LEFT JOIN FETCH r.permisos")
     List<Rol> buscarTodosConPermisos();
+
+    Optional<Rol> findByCodigo(String codigo);
 }

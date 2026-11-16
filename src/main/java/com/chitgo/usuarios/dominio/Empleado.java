@@ -23,6 +23,9 @@ import org.hibernate.annotations.CreationTimestamp;
 @Table(name = "empleado")
 public class Empleado {
 
+    /** Los roles que el Admin da de alta, edita y da de baja (HU-14). El Admin lo crea el Gerente/Dueño. */
+    public static final Set<String> ROLES_GESTIONABLES = Set.of("MOZO", "CAJA", "COCINA");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -52,6 +55,24 @@ public class Empleado {
         mesasAsignadas.add(mozoMesa);
     }
 
+    /**
+     * Deja asignadas exactamente esas mesas: saca las que no están (orphanRemoval borra la fila) y suma las nuevas
+     * con el local del empleado. Que sean mesas del local lo controla el Service.
+     *
+     * @return false si ya tenía esas mismas mesas
+     */
+    public boolean reemplazarMesas(Set<Long> mesaIds) {
+        boolean cambio = mesasAsignadas.removeIf(mm -> !mesaIds.contains(mm.getMesaId()));
+        Set<Long> actuales = getMesaIds();
+        for (Long mesaId : mesaIds) {
+            if (!actuales.contains(mesaId)) {
+                new MozoMesa(localId, this, mesaId);
+                cambio = true;
+            }
+        }
+        return cambio;
+    }
+
     public Long getId() {
         return id;
     }
@@ -74,5 +95,19 @@ public class Empleado {
 
     public Instant getCreadoEn() {
         return creadoEn;
+    }
+
+    public boolean estaActivo() {
+        return usuario.isActivo();
+    }
+
+    /** El nombre vive en el usuario. */
+    public void renombrar(String nombre, String nombreUsuario) {
+        usuario.renombrar(nombre, nombreUsuario);
+    }
+
+    /** Baja lógica: false si ya estaba dado de baja. */
+    public boolean darDeBaja() {
+        return usuario.darDeBaja();
     }
 }
