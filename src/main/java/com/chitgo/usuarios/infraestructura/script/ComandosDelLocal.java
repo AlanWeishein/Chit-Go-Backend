@@ -17,12 +17,14 @@ import org.springframework.stereotype.Component;
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
 import com.chitgo.compartido.dominio.SolicitudInvalidaException;
 import com.chitgo.usuarios.aplicacion.AltaDeLocalService;
+import com.chitgo.usuarios.aplicacion.SuperadminOperativoService;
+import com.chitgo.usuarios.aplicacion.dto.DatosDeAltaDeSuperadmin;
 import com.chitgo.usuarios.aplicacion.dto.DatosDeAltaDeLocal;
 import com.chitgo.usuarios.aplicacion.dto.LocalCreado;
 
 /**
- * Los comandos del script del local (HU-16): {@code alta-local} y {@code desbloquear-gerente}. Es una cáscara fina
- * sobre {@link AltaDeLocalService}: lee los argumentos, pide la contraseña, muestra el resultado y termina el back.
+ * Comandos locales y del operador experimental: alta y desbloqueo de local/Gerente y SuperAdmin.
+ * Lee argumentos, pide la contraseña, muestra el resultado y termina el back.
  *
  * <p>Solo existe con el perfil {@code script}, que no prende nadie más: ni {@code dev} ni los tests. Cómo se corre
  * está en el README, en "Alta de un local".
@@ -48,7 +50,9 @@ class ComandosDelLocal implements ApplicationRunner {
             Comandos del script del local (perfil script):
               alta-local --local=<nombre> [--direccion=<dirección>] --gerente=<nombre> --email=<email>
               desbloquear-gerente --email=<email>
-            La contraseña provisoria del Gerente/Dueño no va como argumento: se lee de la variable %s
+              crear-superadmin --nombre=<nombre> --email=<email>
+              desbloquear-superadmin --email=<email>
+            La contraseña provisoria no va como argumento: se lee de la variable %s
             o, si no está, se pide por la consola.""".formatted(VARIABLE);
 
     /** De dónde sale la contraseña. Devuelve NULL si no hay forma de pedirla. */
@@ -58,20 +62,24 @@ class ComandosDelLocal implements ApplicationRunner {
     }
 
     private final AltaDeLocalService servicio;
+    private final SuperadminOperativoService superadmins;
     private final ConfigurableApplicationContext contexto;
     private final String urlFront;
     private final FuenteDeContrasena contrasena;
     private final PrintStream salida;
 
     @Autowired
-    ComandosDelLocal(AltaDeLocalService servicio, ConfigurableApplicationContext contexto,
+    ComandosDelLocal(AltaDeLocalService servicio, SuperadminOperativoService superadmins,
+            ConfigurableApplicationContext contexto,
             @Value("${chitgo.script.url-front:http://localhost:5173}") String urlFront) {
-        this(servicio, contexto, urlFront, ComandosDelLocal::contrasenaDelEntornoOLaConsola, System.out);
+        this(servicio, superadmins, contexto, urlFront, ComandosDelLocal::contrasenaDelEntornoOLaConsola, System.out);
     }
 
-    ComandosDelLocal(AltaDeLocalService servicio, ConfigurableApplicationContext contexto, String urlFront,
+    ComandosDelLocal(AltaDeLocalService servicio, SuperadminOperativoService superadmins,
+            ConfigurableApplicationContext contexto, String urlFront,
             FuenteDeContrasena contrasena, PrintStream salida) {
         this.servicio = servicio;
+        this.superadmins = superadmins;
         this.contexto = contexto;
         this.urlFront = urlFront.endsWith("/") ? urlFront.substring(0, urlFront.length() - 1) : urlFront;
         this.contrasena = contrasena;
@@ -100,6 +108,8 @@ class ComandosDelLocal implements ApplicationRunner {
             return switch (comandos.getFirst()) {
                 case "alta-local" -> altaDeLocal(argumentos);
                 case "desbloquear-gerente" -> desbloquearGerente(argumentos);
+                case "crear-superadmin" -> crearSuperadmin(argumentos);
+                case "desbloquear-superadmin" -> desbloquearSuperadmin(argumentos);
                 default -> {
                     salida.println("No existe el comando " + comandos.getFirst() + ".");
                     salida.println(AYUDA);
@@ -152,6 +162,25 @@ class ComandosDelLocal implements ApplicationRunner {
         };
     }
 
+    private int crearSuperadmin(ApplicationArguments argumentos) {
+        String clave = contrasena.leer();
+        if (clave == null) {
+            salida.println("Falta la contraseña: usá " + VARIABLE + " o una consola interactiva.");
+            return MAL_ESCRITO;
+        }
+        var creado = superadmins.crear(new DatosDeAltaDeSuperadmin(opcion(argumentos, "nombre"),
+                opcion(argumentos, "email"), clave));
+        salida.println("SuperAdmin creado: " + creado.email() + " (id " + creado.id()
+                + "). Debe cambiar la contraseña en el primer ingreso.");
+        return BIEN;
+    }
+
+    private int desbloquearSuperadmin(ApplicationArguments argumentos) {
+        boolean cambio = superadmins.desbloquear(opcion(argumentos, "email"));
+        salida.println(cambio ? "SuperAdmin desbloqueado." : "El SuperAdmin no estaba bloqueado. No se cambió nada.");
+        return BIEN;
+    }
+
     private static String opcion(ApplicationArguments argumentos, String nombre) {
         List<String> valores = argumentos.getOptionValues(nombre);
         return valores == null || valores.isEmpty() ? null : valores.getFirst();
@@ -167,7 +196,7 @@ class ComandosDelLocal implements ApplicationRunner {
         if (consola == null) {
             return null;
         }
-        char[] una = consola.readPassword("Contraseña provisoria del Gerente/Dueño: ");
+        char[] una = consola.readPassword("Contraseña provisoria: ");
         char[] otra = consola.readPassword("Repetila: ");
         try {
             if (una == null || otra == null) {

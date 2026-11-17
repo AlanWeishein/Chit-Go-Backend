@@ -6,6 +6,6 @@ import com.chitgo.usuarios.dominio.Rol;
 
 public interface RolRepository {
 
-    /** Por el código: MOZO, CAJA, COCINA, ADMIN o GERENTE_DUENO. */
+    /** Por el código de los datos fijos de roles, incluido SUPERADMIN experimental. */
     Optional<Rol> buscarPorCodigo(String codigo);
 }

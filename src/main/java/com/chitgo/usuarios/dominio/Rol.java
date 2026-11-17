@@ -13,7 +13,7 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 
-/** GERENTE_DUENO, ADMIN, MOZO, CAJA o COCINA. Datos fijos. */
+/** Roles de V2 y SUPERADMIN experimental de V10. Datos fijos. */
 @Entity
 @Table(name = "rol")
 public class Rol {
@@ -22,7 +22,7 @@ public class Rol {
     public static final Set<String> CODIGOS_CON_PIN = Set.of("MOZO", "CAJA", "COCINA");
 
     /** Los que entran con email y contraseña (RF-32, P-12). */
-    public static final Set<String> CODIGOS_CON_EMAIL = Set.of("ADMIN", "GERENTE_DUENO");
+    public static final Set<String> CODIGOS_CON_EMAIL = Set.of("ADMIN", "GERENTE_DUENO", "SUPERADMIN");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

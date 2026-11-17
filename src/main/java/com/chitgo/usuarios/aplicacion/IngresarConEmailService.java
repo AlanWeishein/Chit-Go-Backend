@@ -15,7 +15,7 @@ import com.chitgo.usuarios.dominio.puertos.LocalRepository;
 import com.chitgo.usuarios.dominio.puertos.UsuarioRepository;
 
 /**
- * Login con email y contraseña del Admin y el Gerente/Dueño (CU-11, RF-32), con el bloqueo a los 5 intentos
+ * Login con email y contraseña del Admin, Gerente/Dueño y SuperAdmin experimental, con bloqueo a los 5 intentos
  * (RNF-07). Toda falla da el mismo error, sin decir si el email existe ni si el usuario está bloqueado.
  */
 @Service
