@@ -1,6 +1,12 @@
 # SuperAdmin: inventario y análisis previo
 
-Fecha: **16 de noviembre de 2026**. Estado: **solo análisis; propuesta no implementada**.
+Fecha: **16 de noviembre de 2026**. Estado: **inventario histórico previo a implementar el prototipo**.
+
+**Nota posterior:** este documento conserva el inventario del commit base `a7cb901`.
+German aprobó después implementar y publicar el prototipo mínimo en `feature/superadmin`.
+El comportamiento implementado, los comandos y los contratos para frontend se documentan en
+[SuperAdmin experimental](superadmin-presentacion.md). Las propuestas siguientes son el registro
+histórico del análisis, no el inventario actualizado del prototipo.
 
 ## 1. Resultado principal
 
@@ -8,7 +14,7 @@ El proyecto implementa cinco roles: `GERENTE_DUENO`, `ADMIN`, `MOZO`, `CAJA` y `
 No hay un rol de plataforma implementado ni un acceso administrativo global.
 
 **Sí existe una referencia explícita al Super Admin como trabajo de MVP 2.** Está en
-[AltaDeLocalService.java](../src/main/java/com/chitgo/usuarios/aplicacion/AltaDeLocalService.java#L29):
+[AltaDeLocalService.java en el commit base](https://github.com/AlanWeishein/Chit-Go-Backend/blob/a7cb9012b89f688131e57123917006569255a6bc/src/main/java/com/chitgo/usuarios/aplicacion/AltaDeLocalService.java#L29):
 explica que hoy la auditoría del script registra al Gerente/Dueño y no identifica a la persona
 que ejecutó el comando; esa atribución queda para el «Super Admin del MVP 2».
 

@@ -142,6 +142,23 @@ DELETE FROM usuario WHERE id = @gerente;
 COMMIT;
 ```
 
+## SuperAdmin experimental
+
+La rama `feature/superadmin` incorpora un prototipo separado del MVP: rol `SUPERADMIN`, sin local,
+con solo `local.crear` y `gerente.desbloquear`. No hereda la operación ni las lecturas de los locales.
+La migración V10 agrega rol y permisos, **sin crear usuarios ni contraseñas**.
+
+- `POST /api/v1/superadmin/locales`: alta de local y Gerente; responde 201.
+- `POST /api/v1/superadmin/gerentes/desbloquear`: `{email}`; responde 200 con `{resultado}`.
+- Login por el endpoint de email existente. La contraseña inicial debe cambiarse; escrituras con CSRF.
+- Aprovisionamiento local en perfil `script`: `crear-superadmin --nombre=... --email=...` y
+  `desbloquear-superadmin --email=...`. La contraseña se pide por consola o `CHITGO_CONTRASENA`.
+- Las dos operaciones HTTP auditan el usuario SuperAdmin real en el local afectado.
+
+Preparación de una base aislada, comandos completos, contratos para la nueva pantalla y colección
+Postman: [SuperAdmin experimental](docs/superadmin-presentacion.md).
+El frontend todavía necesita su pantalla; este repositorio implementa el backend.
+
 ## Sesión y CSRF (para el front)
 
 - La sesión del personal es un JWT en la cookie `chitgo_sesion` (HttpOnly, SameSite=Strict). El front
