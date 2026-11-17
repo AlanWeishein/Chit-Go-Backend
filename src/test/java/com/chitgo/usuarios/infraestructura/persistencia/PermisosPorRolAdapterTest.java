@@ -36,4 +36,12 @@ class PermisosPorRolAdapterTest {
     void unRolQueNoExisteNoTieneNingunPermiso() {
         assertThat(permisosPorRol.de("NO_EXISTE")).isNotNull().isEmpty();
     }
+
+    @Test
+    void superadminTieneSoloLosDosPermisosDelPrototipoYSinHerencia() {
+        assertThat(permisosPorRol.de("SUPERADMIN")).containsExactlyInAnyOrder("local.crear", "gerente.desbloquear");
+        for (String rol : java.util.List.of("ADMIN", "GERENTE_DUENO", "MOZO", "CAJA", "COCINA")) {
+            assertThat(permisosPorRol.de(rol)).doesNotContain("local.crear", "gerente.desbloquear");
+        }
+    }
 }

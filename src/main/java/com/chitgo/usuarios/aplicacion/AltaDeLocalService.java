@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.chitgo.auditoria.dominio.puertos.Auditor;
@@ -20,26 +21,25 @@ import com.chitgo.usuarios.aplicacion.dto.LocalCreado;
 import com.chitgo.usuarios.dominio.Local;
 import com.chitgo.usuarios.dominio.Rol;
 import com.chitgo.usuarios.dominio.Usuario;
+import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 import com.chitgo.usuarios.dominio.puertos.CodificadorDeClaves;
 import com.chitgo.usuarios.dominio.puertos.LocalRepository;
 import com.chitgo.usuarios.dominio.puertos.RolRepository;
 import com.chitgo.usuarios.dominio.puertos.UsuarioRepository;
 
 /**
- * Lo que hace el script del local (HU-16, decidido el 10/10): el alta del local con su Gerente/Dueño y el desbloqueo
- * del Gerente/Dueño, que no tiene a nadie por encima en el sistema (punto 9 del 20/10, opción A). No hay pantallas:
- * lo llama {@code ComandosDelLocal}, con el perfil {@code script}.
+ * Alta del local y desbloqueo del Gerente/Dueño: conserva las entradas del script de HU-16 y agrega
+ * entradas con permisos para el SuperAdmin experimental. El script usa {@code ComandosDelLocal}.
  *
  * <p>Sin un usuario logueado, en la auditoría figura el mismo Gerente/Dueño, con {@code "origen": "script"} en el
  * valor nuevo: {@code registro_auditoria.usuario_id} es NOT NULL y no hay un usuario del sistema. La auditoría no
- * dice qué persona corrió el script; eso queda para el Super Admin del MVP 2.
+ * dice qué persona corrió el script. El prototipo de SuperAdmin usa métodos separados con autor autenticado.
  */
 @Service
 public class AltaDeLocalService {
 
     static final String ROL_GERENTE = "GERENTE_DUENO";
     static final String EMAIL_REPETIDO = "Ya hay un usuario con ese email";
-    static final Map<String, Object> ORIGEN = Map.of("origen", "script");
 
     /** Lo que pasó con el desbloqueo. Solo DESBLOQUEADO cambia algo y queda en la auditoría. */
     public enum ResultadoDelDesbloqueo {
@@ -74,6 +74,16 @@ public class AltaDeLocalService {
      */
     @Transactional
     public LocalCreado darDeAlta(DatosDeAltaDeLocal datos) {
+        return crear(datos, null);
+    }
+
+    @Transactional
+    @PreAuthorize("hasAuthority('local.crear')")
+    public LocalCreado darDeAltaComoSuperadmin(UsuarioAutenticado operador, DatosDeAltaDeLocal datos) {
+        return crear(datos, operador.usuarioId());
+    }
+
+    private LocalCreado crear(DatosDeAltaDeLocal datos, Long operadorId) {
         validar(datos);
         if (usuarios.existeEmail(datos.email())) {
             throw new ReglaDeNegocioException(EMAIL_REPETIDO);
@@ -86,8 +96,8 @@ public class AltaDeLocalService {
         Local local = locales.guardar(new Local(gerente.getId(), datos.nombreLocal(), datos.direccion(),
                 UUID.randomUUID().toString()));
 
-        auditor.registrar(local.getId(), gerente.getId(), "CREAR_LOCAL", "LOCAL", local.getId(), null,
-                valores(local, gerente));
+        auditor.registrar(local.getId(), operadorId == null ? gerente.getId() : operadorId,
+                "CREAR_LOCAL", "LOCAL", local.getId(), null, valores(local, gerente, operadorId));
         return new LocalCreado(local.getId(), local.getNombre(), local.getTokenStaff(), gerente.getId(),
                 gerente.getEmail());
     }
@@ -100,6 +110,16 @@ public class AltaDeLocalService {
      */
     @Transactional
     public ResultadoDelDesbloqueo desbloquearGerente(String email) {
+        return desbloquear(email, null);
+    }
+
+    @Transactional
+    @PreAuthorize("hasAuthority('gerente.desbloquear')")
+    public ResultadoDelDesbloqueo desbloquearGerenteComoSuperadmin(UsuarioAutenticado operador, String email) {
+        return desbloquear(email, operador.usuarioId());
+    }
+
+    private ResultadoDelDesbloqueo desbloquear(String email, Long operadorId) {
         if (email == null || email.isBlank()) {
             throw new SolicitudInvalidaException("Falta el email");
         }
@@ -108,6 +128,9 @@ public class AltaDeLocalService {
                 .orElse(null);
         if (gerente == null) {
             return ResultadoDelDesbloqueo.NO_ES_GERENTE;
+        }
+        if (operadorId != null && !gerente.isActivo()) {
+            throw new ReglaDeNegocioException("El Gerente/Dueño está dado de baja");
         }
         Local local = locales.buscarPorPropietario(gerente.getId()).orElse(null);
         if (local == null) {
@@ -119,9 +142,9 @@ public class AltaDeLocalService {
         }
         usuarios.guardar(gerente);
         Map<String, Object> despues = estadoDelBloqueo(gerente);
-        despues.putAll(ORIGEN);
-        auditor.registrar(local.getId(), gerente.getId(), "DESBLOQUEAR_GERENTE", "USUARIO", gerente.getId(), antes,
-                despues);
+        despues.put("origen", operadorId == null ? "script" : "superadmin");
+        auditor.registrar(local.getId(), operadorId == null ? gerente.getId() : operadorId,
+                "DESBLOQUEAR_GERENTE", "USUARIO", gerente.getId(), antes, despues);
         return ResultadoDelDesbloqueo.DESBLOQUEADO;
     }
 
@@ -141,7 +164,7 @@ public class AltaDeLocalService {
     }
 
     /** Lo que queda en la auditoría del alta: nunca la contraseña ni su hash. */
-    private static Map<String, Object> valores(Local local, Usuario gerente) {
+    private static Map<String, Object> valores(Local local, Usuario gerente, Long operadorId) {
         Map<String, Object> delGerente = new LinkedHashMap<>();
         delGerente.put("id", gerente.getId());
         delGerente.put("nombre", gerente.getNombre());
@@ -150,7 +173,7 @@ public class AltaDeLocalService {
         valores.put("nombre", local.getNombre());
         valores.put("direccion", local.getDireccion());
         valores.put("gerente", delGerente);
-        valores.putAll(ORIGEN);
+        valores.put("origen", operadorId == null ? "script" : "superadmin");
         return valores;
     }
 

@@ -17,6 +17,8 @@ import org.springframework.boot.DefaultApplicationArguments;
 
 import com.chitgo.compartido.dominio.ReglaDeNegocioException;
 import com.chitgo.usuarios.aplicacion.AltaDeLocalService;
+import com.chitgo.usuarios.aplicacion.SuperadminOperativoService;
+import com.chitgo.usuarios.aplicacion.dto.DatosDeAltaDeSuperadmin;
 import com.chitgo.usuarios.aplicacion.AltaDeLocalService.ResultadoDelDesbloqueo;
 import com.chitgo.usuarios.aplicacion.dto.DatosDeAltaDeLocal;
 import com.chitgo.usuarios.aplicacion.dto.LocalCreado;
@@ -27,10 +29,11 @@ class ComandosDelLocalTest {
     private static final String TOKEN = "11111111-2222-4333-8444-555555555555";
 
     private final AltaDeLocalService servicio = mock(AltaDeLocalService.class);
+    private final SuperadminOperativoService superadmins = mock(SuperadminOperativoService.class);
     private final ByteArrayOutputStream salida = new ByteArrayOutputStream();
     private String contrasena = "Provisoria2026!";
 
-    private final ComandosDelLocal comandos = new ComandosDelLocal(servicio, null, "http://localhost:5173/",
+    private final ComandosDelLocal comandos = new ComandosDelLocal(servicio, superadmins, null, "http://localhost:5173/",
             () -> contrasena, new PrintStream(salida, true, StandardCharsets.UTF_8));
 
     @Test
@@ -98,6 +101,34 @@ class ComandosDelLocalTest {
         assertThat(ejecutar("desbloquear-gerente", "--email=solo@p.test")).isEqualTo(ComandosDelLocal.NO_CAMBIO_NADA);
         assertThat(texto()).contains("desbloqueado: d@p.test", "no estaba bloqueado",
                 "No hay un Gerente/Dueño con el email admin@p.test", "no tiene un local");
+    }
+
+    @Test
+    void creaElSuperadminSinMostrarLaContrasena() {
+        when(superadmins.crear(any())).thenReturn(new SuperadminOperativoService.OperadorCreado(50L, "super@prueba.test"));
+        assertThat(ejecutar("crear-superadmin", "--nombre=Operador", "--email=super@prueba.test"))
+                .isEqualTo(ComandosDelLocal.BIEN);
+        verify(superadmins).crear(new DatosDeAltaDeSuperadmin("Operador", "super@prueba.test", contrasena));
+        assertThat(texto()).contains("SuperAdmin creado", "primer ingreso").doesNotContain(contrasena);
+    }
+
+    @Test
+    void elAltaDeSuperadminRechazaContrasenaPorArgumentoOAusente() {
+        assertThat(ejecutar("crear-superadmin", "--password=secreto"))
+                .isEqualTo(ComandosDelLocal.MAL_ESCRITO);
+        contrasena = null;
+        assertThat(ejecutar("crear-superadmin", "--nombre=Operador", "--email=super@prueba.test"))
+                .isEqualTo(ComandosDelLocal.MAL_ESCRITO);
+        verifyNoInteractions(superadmins);
+    }
+
+    @Test
+    void desbloqueaSuperadminSoloPorElComandoOperativo() {
+        when(superadmins.desbloquear("super@prueba.test")).thenReturn(true);
+        assertThat(ejecutar("desbloquear-superadmin", "--email=super@prueba.test"))
+                .isEqualTo(ComandosDelLocal.BIEN);
+        verify(superadmins).desbloquear("super@prueba.test");
+        assertThat(texto()).contains("SuperAdmin desbloqueado");
     }
 
     private int ejecutar(String... argumentos) {

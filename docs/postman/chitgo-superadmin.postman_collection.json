@@ -1,0 +1,344 @@
+{
+  "info": {
+    "_postman_id": "e25129d4-9ab1-45c3-8df5-400336422dc6",
+    "name": "Chit&Go — SuperAdmin experimental",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Backend experimental: preparar la cuenta por script y completar variables de contraseñas localmente. Ejecutar CSRF, login, cambio inicial, sesión y las dos operaciones. No contiene credenciales reales."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "superadminEmail",
+      "value": "superadmin@prototipo.test",
+      "type": "string"
+    },
+    {
+      "key": "superadminPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "superadminNuevaPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "nombreLocal",
+      "value": "Local prototipo",
+      "type": "string"
+    },
+    {
+      "key": "direccion",
+      "value": "Calle de prueba 1",
+      "type": "string"
+    },
+    {
+      "key": "nombreGerente",
+      "value": "Gerente de prueba",
+      "type": "string"
+    },
+    {
+      "key": "gerenteEmail",
+      "value": "gerente@prototipo.test",
+      "type": "string"
+    },
+    {
+      "key": "gerentePassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "localId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gerenteId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (['POST','PUT','PATCH','DELETE'].includes(pm.request.method)) {",
+          "  const csrf = pm.cookies.get('XSRF-TOKEN');",
+          "  if (csrf) pm.request.headers.upsert({ key: 'X-XSRF-TOKEN', value: csrf });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Obtener CSRF",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ping",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "ping"
+          ]
+        }
+      }
+    },
+    {
+      "name": "2. Login SuperAdmin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/admin/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "admin",
+            "login"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{superadminEmail}}\",\n  \"password\": \"{{superadminPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Login válido', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) pm.test('Rol SuperAdmin', () => pm.expect(pm.response.json().rol).to.eql('SUPERADMIN'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Cambiar contraseña inicial (solo si debeCambiarCredencial)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/credencial",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "credencial"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"password\": \"{{superadminNuevaPassword}}\",\n  \"passwordRepetida\": \"{{superadminNuevaPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Contraseña propia elegida', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Consultar sesión",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/sesion",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "sesion"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Sesión válida', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Crear local y Gerente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/superadmin/locales",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "superadmin",
+            "locales"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombreLocal\": \"{{nombreLocal}}\",\n  \"direccion\": \"{{direccion}}\",\n  \"nombreGerente\": \"{{nombreGerente}}\",\n  \"email\": \"{{gerenteEmail}}\",\n  \"password\": \"{{gerentePassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Local creado', () => pm.response.to.have.status(201));",
+              "if (pm.response.code === 201) {",
+              "  const creado = pm.response.json();",
+              "  pm.collectionVariables.set('localId', creado.localId);",
+              "  pm.collectionVariables.set('gerenteId', creado.gerenteId);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Desbloquear Gerente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/superadmin/gerentes/desbloquear",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "superadmin",
+            "gerentes",
+            "desbloquear"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{gerenteEmail}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Desbloqueo controlado', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) pm.test('Resultado esperado', () => pm.expect(['DESBLOQUEADO','NO_ESTABA_BLOQUEADO']).to.include(pm.response.json().resultado));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Cerrar sesión",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/logout",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "logout"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Sesión cerrada', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

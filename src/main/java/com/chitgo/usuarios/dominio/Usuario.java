@@ -247,6 +247,13 @@ public class Usuario {
         return usuario;
     }
 
+    /** Operador de plataforma: sin local y con cambio obligatorio de la contraseña inicial. */
+    public static Usuario nuevoSuperadmin(Rol rol, String nombre, String email, String hashPassword) {
+        Usuario usuario = new Usuario(null, rol, nombre, null, email, hashPassword, null);
+        usuario.debeCambiarCredencial = true;
+        return usuario;
+    }
+
     /** Lo vuelve a dar de alta. Devuelve false si ya estaba activo, como {@link #darDeBaja()}. */
     public boolean reactivar() {
         if (activo) {

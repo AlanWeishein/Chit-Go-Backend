@@ -226,7 +226,7 @@ class GestionarEmpleadosServiceTest {
 
     @Test
     void solo_se_dan_de_alta_mozo_caja_y_cocina_admin_gerente_y_los_inventados_son_400() {
-        for (String rol : List.of("ADMIN", "GERENTE_DUENO", "Gerente", "DUENO", "pirata")) {
+        for (String rol : List.of("ADMIN", "GERENTE_DUENO", "SUPERADMIN", "Gerente", "DUENO", "pirata")) {
             assertEquals("El rol tiene que ser Mozo, Caja o Cocina", mensaje(SolicitudInvalidaException.class,
                     () -> servicio.crear(ADMIN, new DatosDeAltaDeEmpleado("Pedro", rol, "0000", null, null))), rol);
         }
