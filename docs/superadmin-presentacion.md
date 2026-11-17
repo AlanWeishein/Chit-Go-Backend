@@ -58,10 +58,11 @@ GRANT ALL PRIVILEGES ON chitgo_superadmin_test.* TO 'chitgo'@'%';
 
 ```powershell
 $env:DB_URL = 'jdbc:mysql://localhost:3307/chitgo_superadmin_test'
-mvn spring-boot:run '-Dspring-boot.run.profiles=dev'
+mvn clean spring-boot:run '-Dspring-boot.run.profiles=dev'
 ```
 
 El arranque aplica las migraciones, incluida V10, y la seed de desarrollo. No hay SuperAdmin en la seed.
+La compilación limpia evita reutilizar clases de otra rama, especialmente si se probó antes el rate limiter.
 El perfil `script` requiere la base ya migrada; no ejecuta Flyway. Los cambios del archivo de seed
 pueden borrar datos de prueba conforme al comportamiento existente del proyecto.
 
