@@ -1019,3 +1019,46 @@ auditor.registrar(localId, usuarioId, "APROBAR_PEDIDO", "PEDIDO", pedido.getId()
 Gestión de mesas y QR (HU-13), reportes y consulta de auditoría (HU-15), pantalla del salón (HU-17):
 contratos y decisiones en [docs/sprint-3-german.md](docs/sprint-3-german.md).
 La auditoría tiene filtros y paginación; la retención de seis meses se ejecuta como mantenimiento interno.
+
+## Inyección SQL (RNF-15)
+
+Todas las consultas usan parámetros: JPQL con parámetros con nombre (`:localId`) o métodos derivados de
+Spring Data, una única consulta nativa (`SuscripcionPushJpaRepository`) también con nombres, y el JDBC de la
+auditoría y los reportes, donde el `WHERE` se arma con `StringBuilder` pero cada pedazo es fijo y los datos
+entran como `:param`. Ninguna concatena un dato del usuario, y ningún `ORDER BY` ni nombre de columna sale
+del pedido. Un error de base que el back no espera sale por el `/error` de Spring con `message` y
+`stacktrace` en `never` (el valor por defecto), así que la respuesta no filtra SQL. La revisión completa de
+las consultas está en la ST-25 (pruebas de inyección SQL).
+
+### Los tests (tarea 2)
+
+Con el Compose levantado:
+
+```
+mvn test -Dtest=InyeccionSqlTest
+mvn test -Dtest=ErroresDeLaBaseTest
+```
+
+`InyeccionSqlTest` mete las entradas maliciosas en cada campo de texto y filtro, y comprueba que se guardan
+tal cual cuando son un dato, que no hay un 500 ni detalle de SQL en la respuesta y que la base cambia solo en
+lo esperado. `ErroresDeLaBaseTest` fuerza un error de MySQL y comprueba que el SQL no llega a la respuesta.
+
+### Repetir el escaneo con sqlmap
+
+Lo corre quien tenga el back en su compu, contra `localhost` con el perfil `dev` y la base del Compose,
+**nunca contra otra máquina**. Con el back levantado en `dev` y el Compose arriba:
+
+1. Instalar sqlmap (una vez): `git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git target/sqlmap-dev`.
+2. Copia de la base, antes de correr (desde una shell que no reescriba el encoding, por ejemplo Git Bash):
+   `docker exec chitgo-mysql mysqldump -uroot -proot chitgo > target/sqlmap/backup_dev_antes_sqlmap.sql`.
+3. Generar los seis archivos de request con cookies de sesión y CSRF frescas:
+   `powershell -ExecutionPolicy Bypass -File target/sqlmap/preparar-sqlmap.ps1`.
+4. Correr cada uno: `py target/sqlmap-dev/sqlmap.py -r target/sqlmap/<archivo>.txt --batch --level 2 --risk 1 --dbms=mysql`.
+   Las cuatro POST (login del Admin y del mozo, alta de plato y de empleado) llevan además `--drop-set-cookie`,
+   para que sqlmap no rote la cookie de CSRF que el back renueva en cada respuesta; la del mozo, `--ignore-code=401`.
+5. Restaurar la base, porque el alta de plato y de empleado dejan filas de prueba:
+   `docker exec -i chitgo-mysql mysql -uroot -proot chitgo < target/sqlmap/backup_dev_antes_sqlmap.sql`.
+
+El nivel 2 y el riesgo 1 salen de la documentación de sqlmap: el riesgo 1 evita los payloads `OR` que podrían
+cambiar toda una tabla. El armado (el generador, los request y el backup) vive en `target/`, ignorado por
+git, así que no se sube; `mvn clean` lo borra, y si pasa se reclona y se regenera.
