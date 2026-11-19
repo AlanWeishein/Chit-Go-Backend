@@ -29,6 +29,20 @@ El dominio no depende de Spring, JPA ni WebSocket. Los controladores no tienen l
 2. `mvn spring-boot:run -Dspring-boot.run.profiles=dev`
 3. Probar: `GET http://localhost:8080/api/v1/ping`
 
+## Imagen de Docker
+
+El `Dockerfile` arma la imagen del back en dos etapas: compila el jar con Maven (sin tests, que necesitan
+el MySQL) y lo corre con el JRE 21, con un usuario sin privilegios. El perfil y la base no van fijos en la
+imagen: se pasan con variables de entorno.
+
+```
+docker build -t chitgo-back .
+docker run --rm -p 8081:8080 -e SPRING_PROFILES_ACTIVE=dev -e DB_URL=jdbc:mysql://host.docker.internal:3307/chitgo chitgo-back
+```
+
+El segundo comando usa el MySQL del `docker-compose.yml` de acá, que sigue siendo solo para programar con
+IntelliJ. El compose completo (base, back y front) está en el repo de entrega.
+
 ## Reglas del negocio
 
 Los números del negocio no están escritos en el código: salen de `chitgo.reglas` en `application.yml`, que lee
