@@ -1,0 +1,16 @@
+# Para compilar solo hacen falta el pom.xml y src. El .env nunca entra en la imagen.
+target/
+.idea/
+*.iml
+.vscode/
+.claude/
+.git/
+.gitignore
+.env
+.env.*
+docs/
+README.md
+qodana.yaml
+docker-compose.yml
+Dockerfile
+.dockerignore
