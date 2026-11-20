@@ -58,8 +58,6 @@ public class SecurityConfig {
                 pathPattern(HttpMethod.POST, "/api/v1/auth/mozo/login"),
                 pathPattern(HttpMethod.POST, "/api/v1/auth/admin/login"),
                 pathPattern(HttpMethod.GET, "/api/v1/auth/dispositivo"),
-                pathPattern("/swagger-ui.html"), pathPattern("/swagger-ui/**"),
-                pathPattern("/v3/api-docs/**"), pathPattern("/v3/api-docs.yaml"),
                 pathPattern("/error"));
         // No renuevan el token: las públicas, que no piden sesión (los logins dejan la suya); /auth/sesion,
         // porque consultarla no cuenta como actividad; /auth/credencial, que deja su cookie nueva, y
