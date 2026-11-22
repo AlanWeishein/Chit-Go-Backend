@@ -96,6 +96,255 @@ turno todos los días de 00:00 a 23:59. No se cargan cuentas, pedidos, avisos, a
 ausencias: los crea cada caso de prueba. Los tokens de los QR (mesas y staff) están en el
 encabezado del SQL.
 
+## Datos de la demo
+
+La semilla de la entrega, con la que se abre Chit&Go la primera vez (ST-28). Con el perfil `demo`, Flyway
+además de las migraciones de `db/migration` corre `db/demo/V100__datos_de_la_demo.sql`. Carga cuatro locales
+con 20 mesas cada uno, su personal, una carta de verdad y cuentas y pedidos de los 30 días anteriores, para
+que los reportes y la auditoría tengan qué mostrar. **Ninguna cuenta queda abierta**: todas las mesas
+arrancan libres.
+
+### Cómo se levanta
+
+Va sobre una base **vacía**, nunca sobre la de dev. Con el MySQL del Compose, una vez:
+
+```
+docker exec chitgo-mysql mysql -uroot -proot -e "CREATE DATABASE chitgo_demo; GRANT ALL ON chitgo_demo.* TO 'chitgo'@'%';"
+```
+
+Y el back con `demo` contra esa base. `COOKIE_SEGURA=false` deja las cookies sin `Secure`, para entrar por
+http (también desde el celular, como con `dev`):
+
+```
+DB_URL=jdbc:mysql://localhost:3307/chitgo_demo COOKIE_SEGURA=false mvn spring-boot:run -Dspring-boot.run.profiles=demo
+```
+
+En PowerShell, las variables van antes: `$env:DB_URL="jdbc:mysql://localhost:3307/chitgo_demo"; $env:COOKIE_SEGURA="false"`.
+En Docker, el perfil se pasa con `SPRING_PROFILES_ACTIVE=demo` (ver "Imagen de Docker").
+
+- **Corre una sola vez.** Es una migración versionada: Flyway la aplica en el primer arranque y la anota en
+  `flyway_schema_history`. No vuelve a correr al reiniciar el back, y lo que se borre o se cambie desde la app
+  no reaparece. Por eso no borra nada al empezar, al revés que la semilla de dev.
+- **El freno.** Con `demo`, si la base ya tiene algún local y la V100 no está aplicada, el back no arranca:
+  "Esta base ya tiene datos: sacá el perfil demo". Así la semilla nunca cae encima de datos reales.
+- **No se combina con `dev`**: `application-demo.yml` no incluye `db/dev`. Los tests y Postman siguen con
+  `dev` y la base `chitgo`.
+- **Para empezar de cero**, se borra la base y se vuelve a crear (`DROP DATABASE chitgo_demo` y el comando de
+  arriba). Hace falta también si se edita la V100 después de aplicada: Flyway falla al validar la suma de
+  control. Lo mismo si se suma una migración al esquema: queda por debajo de la V100 y no se aplica.
+- **Las fechas son relativas a la carga.** El historial va de ayer a hace 30 días, al mediodía y a la noche:
+  los reportes de la última semana muestran algo aunque se levante en diciembre. Hoy arranca vacío. La
+  auditoría queda muy adentro de los 6 meses de `RetencionDeAuditoria`.
+
+### Historial
+
+En La Esquina, La Pala y La Colina, cuentas cerradas con su ticket y pedidos de los 30 días anteriores. La
+mayoría de los pedidos están servidos; algunos rechazados (`NO_DISPONIBLE`, `PEDIDO_INVALIDO`) y algunos
+cancelados (por el cliente, por Caja o al cerrar la cuenta con el pedido en cocina). Cada acción del personal
+tiene su fila en la auditoría, la misma que deja el back: `APROBAR_PEDIDO`, `RECHAZAR_PEDIDO`,
+`INICIAR_PREPARACION`, `MARCAR_PEDIDO_LISTO`, `SERVIR_PEDIDO`, `CANCELAR_PEDIDO`, `ATENDER_AVISO` y
+`CERRAR_CUENTA`. Solo se usan mesas con mozo.
+
+| Local | Cuentas | Pedidos | Filas de auditoría |
+|---|---|---|---|
+| La Esquina | 104 | 207 | 962 |
+| El Puerto | 0 | 0 | 0 |
+| Pizzería La Pala | 136 | 250 | 1205 |
+| La Colina | 167 | 321 | 1514 |
+
+### Usuarios y URL
+
+Contraseña de todos los que entran con contraseña: `Chitgo2026!`. Nadie tiene que cambiar la credencial al
+entrar. El Gerente/Dueño y el Admin entran por `http://localhost:5173/admin/login`. Mozo y Cocina, por la URL del
+login del personal del local; Caja, por la misma con `/caja` al final. Los mozos también entran con su usuario
+y la contraseña. Los PIN de La Pala y La Colina son el local (3 La Pala, 4 La Colina), el rol (1 Mozo, 2 Caja,
+3 Cocina) y el número dentro del rol.
+
+Las URL son las del front de Vite (`http://localhost:5173`). En el repo de entrega cambia el puerto.
+La pantalla pública no está acá porque su token no es fijo: cambia cada vez que se recrea la base.
+
+#### La Esquina
+
+Los mismos usuarios, PIN, tokens y platos que la semilla de dev, así sirven los casos de Postman. Suma las mesas
+7 a 20, sin mozo, y platos hasta llegar a 30.
+
+Login del personal: `http://localhost:5173/staff/83f39b25-deac-4fde-80cc-4cfdf8117713`
+
+| Rol | Nombre | PIN | Usuario o email |
+|---|---|---|---|
+| Gerente/Dueño | Dueño La Esquina |  | `dueno@laesquina.test` |
+| Admin | Admin La Esquina |  | `admin@laesquina.test` |
+| Mozo | Juan | `1234` | `juan` |
+| Mozo | Ana | `5678` | `ana` |
+| Caja | Carla | `2468` |  |
+| Cocina | Hugo | `1357` |  |
+
+<details>
+<summary>Las 20 mesas de La Esquina</summary>
+
+| Mesa | Mozo | URL |
+|---|---|---|
+| 1 | Juan | `http://localhost:5173/mesa/d4964b6b-fdae-4b4f-83e9-1c1e78a21723` |
+| 2 | Juan | `http://localhost:5173/mesa/7ac79c59-b48d-4db2-8365-5c6a6565d9f4` |
+| 3 | Juan y Ana | `http://localhost:5173/mesa/22f4331e-4464-43b8-a7e2-eea2682b1a40` |
+| 4 | Ana | `http://localhost:5173/mesa/f0c89fba-24a4-4cb4-acff-dee757071597` |
+| 5 | (sin mozo) | `http://localhost:5173/mesa/c8b58174-70d8-431f-8b8f-b0d3531c8409` |
+| 6 | (sin mozo) | `http://localhost:5173/mesa/1a8af780-91b5-4815-a6cb-128a6ef92e59` |
+| 7 | (sin mozo) | `http://localhost:5173/mesa/a9101e94-fd2a-470e-8345-7886b098f176` |
+| 8 | (sin mozo) | `http://localhost:5173/mesa/9a48f77f-8fdb-42f8-b37e-32bc784b182c` |
+| 9 | (sin mozo) | `http://localhost:5173/mesa/3abc56b6-9ca3-4dfd-ada3-d459c148f5f9` |
+| 10 | (sin mozo) | `http://localhost:5173/mesa/c6a85b5f-58dd-48ae-bb25-c3c305ecfe54` |
+| 11 | (sin mozo) | `http://localhost:5173/mesa/28c32028-7d0d-420f-8368-e08acefa36f9` |
+| 12 | (sin mozo) | `http://localhost:5173/mesa/6eacfac2-1905-4e70-b764-763c044d25d9` |
+| 13 | (sin mozo) | `http://localhost:5173/mesa/70349c09-0e4c-48f6-80a2-ebae3bae7e79` |
+| 14 | (sin mozo) | `http://localhost:5173/mesa/838acc0a-0d60-4222-8a7f-52746eccaa1a` |
+| 15 | (sin mozo) | `http://localhost:5173/mesa/1411e744-4d5a-4ede-b705-2ac183ddbd22` |
+| 16 | (sin mozo) | `http://localhost:5173/mesa/3ee23e2b-2e7a-4c3d-82ec-81dfedd41299` |
+| 17 | (sin mozo) | `http://localhost:5173/mesa/3afc2af3-a049-4389-9086-2dc68144795c` |
+| 18 | (sin mozo) | `http://localhost:5173/mesa/ec5122a1-3afe-4992-a5a4-ca8e1c9dfda1` |
+| 19 | (sin mozo) | `http://localhost:5173/mesa/55775c6e-e35a-4e1e-aaf4-96f970b7b150` |
+| 20 | (sin mozo) | `http://localhost:5173/mesa/63a57323-0271-474b-b38b-3a90fd91bbb6` |
+
+</details>
+
+#### El Puerto
+
+El segundo local de dev, para ver que los datos no se mezclan. Suma las mesas 3 a 20, sin mozo, y platos hasta
+llegar a 29. **No tiene historial**: no tiene Caja ni Cocina que aprueben, cocinen y cierren.
+
+Login del personal: `http://localhost:5173/staff/de076a51-1fbd-46f5-98c5-c895ce59a007`
+
+| Rol | Nombre | PIN | Usuario o email |
+|---|---|---|---|
+| Gerente/Dueño | Dueño El Puerto |  | `dueno@elpuerto.test` |
+| Mozo | Juan | `4321` | `juan` |
+
+<details>
+<summary>Las 20 mesas de El Puerto</summary>
+
+| Mesa | Mozo | URL |
+|---|---|---|
+| 1 | Juan | `http://localhost:5173/mesa/ab0124a8-6033-4d73-a1f6-3513140e62f7` |
+| 2 | Juan | `http://localhost:5173/mesa/9426856c-793f-405c-bc07-46be50499627` |
+| 3 | (sin mozo) | `http://localhost:5173/mesa/596e0328-1822-4e18-90f3-ce192a28b6ba` |
+| 4 | (sin mozo) | `http://localhost:5173/mesa/305786ef-06f7-4326-992d-113de2df14cc` |
+| 5 | (sin mozo) | `http://localhost:5173/mesa/8199bf98-5cdb-419b-a750-b50ec7a747d9` |
+| 6 | (sin mozo) | `http://localhost:5173/mesa/a6bdc286-2bd5-4a69-abd9-9c6cd9815344` |
+| 7 | (sin mozo) | `http://localhost:5173/mesa/3dc8cbb1-7709-4feb-b505-11d80a47ada6` |
+| 8 | (sin mozo) | `http://localhost:5173/mesa/f336c913-e8c6-417b-930c-13a8b292bd21` |
+| 9 | (sin mozo) | `http://localhost:5173/mesa/f6fe3f82-3323-4f13-97d6-814e2dd64c5e` |
+| 10 | (sin mozo) | `http://localhost:5173/mesa/0cb0c4e2-35d5-4f1f-b64d-3dc8fd4c609f` |
+| 11 | (sin mozo) | `http://localhost:5173/mesa/0fccf298-692c-4346-b644-deeb15e3992d` |
+| 12 | (sin mozo) | `http://localhost:5173/mesa/65292bf7-0b67-4564-b34b-2206c59ac8cf` |
+| 13 | (sin mozo) | `http://localhost:5173/mesa/a37652f0-ab40-4b8e-9111-882f508152aa` |
+| 14 | (sin mozo) | `http://localhost:5173/mesa/a2a75942-b4e5-4411-ae72-597dfdf3cbb2` |
+| 15 | (sin mozo) | `http://localhost:5173/mesa/28d5dce2-c7bc-4640-ae45-ab9731c6963a` |
+| 16 | (sin mozo) | `http://localhost:5173/mesa/1a8ba11a-2ad4-4d02-ab28-29e3962d418b` |
+| 17 | (sin mozo) | `http://localhost:5173/mesa/d84f46a2-44b1-4c22-aafb-95cea9e20ff7` |
+| 18 | (sin mozo) | `http://localhost:5173/mesa/67901aaf-4310-4cef-9610-2cbfca2d5dba` |
+| 19 | (sin mozo) | `http://localhost:5173/mesa/0014ae65-b9aa-4e32-814f-a98a22587c8d` |
+| 20 | (sin mozo) | `http://localhost:5173/mesa/81322aa7-d238-4a73-a80d-3bc1fd0be691` |
+
+</details>
+
+#### Pizzería La Pala
+
+Una pizzería inventada, con 29 platos.
+
+Login del personal: `http://localhost:5173/staff/d7aa3741-af38-40f2-8bfa-3bba2f2d8e99`
+
+| Rol | Nombre | PIN | Usuario o email |
+|---|---|---|---|
+| Gerente/Dueño | Dueño La Pala |  | `dueno@lapala.test` |
+| Admin | Admin La Pala |  | `admin@lapala.test` |
+| Caja | Marta | `3201` |  |
+| Caja | Nicolás | `3202` |  |
+| Cocina | Oscar | `3301` |  |
+| Cocina | Paula | `3302` |  |
+| Mozo | Bruno | `3101` | `bruno` |
+| Mozo | Camila | `3102` | `camila` |
+| Mozo | Diego | `3103` | `diego` |
+| Mozo | Florencia | `3104` | `florencia` |
+| Mozo | Lucas | `3105` | `lucas` |
+
+<details>
+<summary>Las 20 mesas de Pizzería La Pala</summary>
+
+| Mesa | Mozo | URL |
+|---|---|---|
+| 1 | Bruno | `http://localhost:5173/mesa/89e4bbd7-0b91-4d2c-b96b-2d622d37e8df` |
+| 2 | Bruno | `http://localhost:5173/mesa/751646c4-e2b4-4d80-808d-b3bc3236ac8b` |
+| 3 | Bruno | `http://localhost:5173/mesa/2bd4faff-7588-47f5-a5af-e625904bfc32` |
+| 4 | Bruno | `http://localhost:5173/mesa/77e6cf43-c14b-48bc-8a26-4b9b9d3d6c6c` |
+| 5 | Camila | `http://localhost:5173/mesa/d64dc4c0-9b17-42cd-952d-0afd9076bab5` |
+| 6 | Camila | `http://localhost:5173/mesa/1b1d1ea0-efcd-4899-a805-97e2cad82d52` |
+| 7 | Camila | `http://localhost:5173/mesa/678d6095-0a2a-4340-81dc-a5c11273d274` |
+| 8 | Camila | `http://localhost:5173/mesa/3dec99d1-9c0f-405d-a46e-447dc671c7eb` |
+| 9 | Diego | `http://localhost:5173/mesa/22b15db4-8992-4e5c-93d1-9a213dbb61db` |
+| 10 | Diego | `http://localhost:5173/mesa/3ecbbcd8-fad6-4498-aaeb-c418cb92134e` |
+| 11 | Diego | `http://localhost:5173/mesa/2898865a-87a7-4126-8135-7d731666bdee` |
+| 12 | Diego | `http://localhost:5173/mesa/c613a06d-8442-4625-b08c-f55575d91998` |
+| 13 | Florencia | `http://localhost:5173/mesa/14e8bc42-7a92-49f2-89d4-798ce7512cdc` |
+| 14 | Florencia | `http://localhost:5173/mesa/578daaab-d04a-49e2-8a05-204268e68fe7` |
+| 15 | Florencia y Lucas | `http://localhost:5173/mesa/59d38688-dfee-49a3-85ab-f04546b868f9` |
+| 16 | Florencia y Lucas | `http://localhost:5173/mesa/0dd75686-2041-448f-b5f6-268eeb2b9e34` |
+| 17 | Lucas | `http://localhost:5173/mesa/a4d076ed-c33c-4441-8d6d-6c320581f36c` |
+| 18 | Lucas | `http://localhost:5173/mesa/a69e28f4-efb8-405d-8c87-7d16390b9a18` |
+| 19 | (sin mozo) | `http://localhost:5173/mesa/a380fb10-2b94-4c86-a420-8cb1669e1abe` |
+| 20 | (sin mozo) | `http://localhost:5173/mesa/36d7a5dc-3a5b-4ed7-99b2-b624994364a8` |
+
+</details>
+
+#### La Colina
+
+Una parrilla real (@lacolinaresto), con su carta entera: 23 categorías y 189 platos, con sus precios. El
+personal y la dirección son inventados.
+
+Login del personal: `http://localhost:5173/staff/4eeea779-7b24-4857-909f-55f3f889efc8`
+
+| Rol | Nombre | PIN | Usuario o email |
+|---|---|---|---|
+| Gerente/Dueño | Dueño La Colina |  | `dueno@lacolina.test` |
+| Admin | Admin La Colina |  | `admin@lacolina.test` |
+| Caja | Inés | `4201` |  |
+| Caja | Julián | `4202` |  |
+| Cocina | Ramón | `4301` |  |
+| Cocina | Sofía | `4302` |  |
+| Mozo | Rocío | `4101` | `rocio` |
+| Mozo | Sergio | `4102` | `sergio` |
+| Mozo | Tomás | `4103` | `tomas` |
+| Mozo | Valeria | `4104` | `valeria` |
+| Mozo | Gonzalo | `4105` | `gonzalo` |
+
+<details>
+<summary>Las 20 mesas de La Colina</summary>
+
+| Mesa | Mozo | URL |
+|---|---|---|
+| 1 | Rocío | `http://localhost:5173/mesa/993e499c-556a-42c6-bc4e-75eb0a7be17e` |
+| 2 | Rocío | `http://localhost:5173/mesa/cb2f5277-c923-412f-8aae-586dd0e99028` |
+| 3 | Rocío | `http://localhost:5173/mesa/72841901-b96d-4300-b0f9-6f7c74aecb2e` |
+| 4 | Rocío | `http://localhost:5173/mesa/fa2306e2-8fba-4ef5-8007-ddf91a29ad53` |
+| 5 | Sergio | `http://localhost:5173/mesa/77475fef-1303-4791-b23d-d6d99054923e` |
+| 6 | Sergio | `http://localhost:5173/mesa/ee37858f-d9a7-48a6-bde4-202a793e16c7` |
+| 7 | Sergio | `http://localhost:5173/mesa/1925565e-52c6-45cd-b685-baf9dec99138` |
+| 8 | Sergio | `http://localhost:5173/mesa/0681b7e1-9e45-4cd9-81c5-93f521fe6290` |
+| 9 | Tomás | `http://localhost:5173/mesa/d5b5bf86-3bf2-420d-8f86-1ba870b2b53c` |
+| 10 | Tomás | `http://localhost:5173/mesa/09b86c7d-a193-456e-8c10-cc5cf9175df5` |
+| 11 | Tomás | `http://localhost:5173/mesa/ff25c0c1-6aed-408a-b737-3ab5234ced16` |
+| 12 | Tomás | `http://localhost:5173/mesa/4a95c79c-0bbf-4379-92de-ac4b9fe17f74` |
+| 13 | Valeria | `http://localhost:5173/mesa/f7db499d-d79d-4654-8c02-a720c7196945` |
+| 14 | Valeria | `http://localhost:5173/mesa/dc713853-b797-4a2d-aa9a-3874540b1eec` |
+| 15 | Valeria y Gonzalo | `http://localhost:5173/mesa/0abd4d55-58f1-419a-bf81-3dfc54d1f58c` |
+| 16 | Valeria y Gonzalo | `http://localhost:5173/mesa/d341a48f-75c8-439a-9f9c-4058eccd4197` |
+| 17 | Gonzalo | `http://localhost:5173/mesa/6dd2be2a-fb35-4a57-b65a-185dd75c1e0f` |
+| 18 | Gonzalo | `http://localhost:5173/mesa/7193926d-66e5-431f-a3d8-3cbf0b785e94` |
+| 19 | (sin mozo) | `http://localhost:5173/mesa/f97cab94-c658-4227-b6bc-14da84589803` |
+| 20 | (sin mozo) | `http://localhost:5173/mesa/9006e0f8-615b-483c-ace3-2e611e64ebc8` |
+
+</details>
+
+
 ## Alta de un local
 
 En el MVP 1 no hay pantallas para dar de alta un local (decidido el 10/10): se hace con dos comandos
