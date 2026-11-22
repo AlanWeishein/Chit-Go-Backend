@@ -21,4 +21,7 @@ public interface LocalRepository {
 
     /** El alta del local con el script (HU-16). Con flush, así el id y cualquier error salen acá. */
     Local guardar(Local local);
+
+    /** Si la base ya tiene algún local: el primer local del .env solo se crea sobre una base sin ninguno. */
+    boolean hayLocales();
 }

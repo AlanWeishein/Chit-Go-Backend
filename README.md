@@ -350,6 +350,8 @@ Login del personal: `http://localhost:5173/staff/4eeea779-7b24-4857-909f-55f3f88
 En el MVP 1 no hay pantallas para dar de alta un local (decidido el 10/10): se hace con dos comandos
 del mismo back, con el perfil `script`. Cada uno corre una vez contra la base de `DB_URL` (por
 defecto, la del Compose) y termina. Nunca corren al levantar el back con `dev` ni en los tests.
+El primer local de una instalación nueva también se puede crear desde el `.env`, al arrancar el back
+(ver "Desde el `.env`", al final de esta sección).
 
 - **`alta-local`** crea, en una sola transacción, al Gerente/Dueño (sin local, con la contraseña
   provisoria y `debe_cambiar_credencial` en TRUE) y el local que lo apunta, con un `token_staff`
@@ -404,6 +406,50 @@ DELETE FROM local WHERE id = @local;
 DELETE FROM usuario WHERE id = @gerente;
 COMMIT;
 ```
+
+### Desde el `.env`
+
+Para una instalación nueva, con la base vacía: se llena el `.env` y se levanta el back, sin correr el
+script. Al arrancar, después de Flyway, el back crea el local y su Gerente/Dueño con estas cinco
+variables. Lo hace `PrimerLocalDelEntorno`, que no corre con el perfil `script`.
+
+| Variable | Qué es |
+|---|---|
+| `CHITGO_LOCAL_NOMBRE` | El nombre del local |
+| `CHITGO_LOCAL_DIRECCION` | Su dirección |
+| `CHITGO_GERENTE_NOMBRE` | El nombre del Gerente/Dueño |
+| `CHITGO_GERENTE_EMAIL` | Su email, con la misma regla que el login |
+| `CHITGO_GERENTE_CONTRASENA` | Su contraseña provisoria, de 8 a 64 caracteres |
+
+- **Ninguna cargada:** no hace nada. Es lo que pasa en dev, en los tests y en la demo.
+- **Las cinco y la base sin locales:** crea el local, como `alta-local`, y deja en el log el nombre
+  del local, el email del Gerente/Dueño y la URL del login del personal (`<front>/staff/<token>`, con
+  el front de `URL_FRONT`). La contraseña no va al log.
+- **Las cinco y la base con algún local:** no crea nada y lo dice en el log. Reiniciar el back no
+  duplica el local, y la contraseña del `.env` no pisa la que eligió el Gerente/Dueño.
+- **Algunas sí y otras no:** el back no arranca, y el error nombra las que faltan. Van las cinco o
+  ninguna (la dirección acá no es opcional).
+- **Un dato que no sirve** (email mal escrito o repetido, contraseña de menos de 8 o más de 64
+  caracteres): el back no arranca, con el mismo mensaje que da `alta-local`, y no se guarda nada.
+
+La contraseña es **provisoria**: el Gerente/Dueño entra por `/auth/admin/login` con
+`debeCambiarCredencial: true` y tiene que elegir la suya antes de hacer otra cosa. Desde ahí, la del
+`.env` ya no sirve y se puede borrar. En la auditoría queda un `CREAR_LOCAL` con `"origen": "entorno"`.
+Solo arma el primero: los demás locales se crean con `alta-local`.
+
+Para probarlo sin tocar la base `chitgo`, con una base vacía aparte en el MySQL del Compose:
+
+```powershell
+docker exec chitgo-mysql mysql -uroot -proot -e "CREATE DATABASE chitgo_limpia; GRANT ALL ON chitgo_limpia.* TO 'chitgo'@'%';"
+$env:DB_URL = 'jdbc:mysql://localhost:3307/chitgo_limpia'
+$env:COOKIE_SEGURA = 'false'
+$env:CHITGO_LOCAL_NOMBRE = 'La Plaza'
+# ... y las otras cuatro
+mvn spring-boot:run
+```
+
+Sin perfil, la cookie sale `Secure` y por http no se puede entrar: por eso va `COOKIE_SEGURA=false`
+(el perfil `dev` la apaga solo).
 
 ## SuperAdmin experimental
 

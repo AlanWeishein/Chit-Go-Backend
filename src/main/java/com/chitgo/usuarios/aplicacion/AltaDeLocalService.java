@@ -32,7 +32,7 @@ import com.chitgo.usuarios.dominio.puertos.UsuarioRepository;
  * entradas con permisos para el SuperAdmin experimental. El script usa {@code ComandosDelLocal}.
  *
  * <p>Sin un usuario logueado, en la auditoría figura el mismo Gerente/Dueño, con {@code "origen": "script"} en el
- * valor nuevo: {@code registro_auditoria.usuario_id} es NOT NULL y no hay un usuario del sistema. La auditoría no
+ * valor nuevo ({@code "entorno"} si el local sale del .env al arrancar, ST-32): {@code registro_auditoria.usuario_id} es NOT NULL y no hay un usuario del sistema. La auditoría no
  * dice qué persona corrió el script. El prototipo de SuperAdmin usa métodos separados con autor autenticado.
  */
 @Service
@@ -74,16 +74,25 @@ public class AltaDeLocalService {
      */
     @Transactional
     public LocalCreado darDeAlta(DatosDeAltaDeLocal datos) {
-        return crear(datos, null);
+        return crear(datos, null, "script");
+    }
+
+    /**
+     * El mismo alta, para el primer local que se arma desde el .env al arrancar el back (ST-32). Solo cambia el
+     * {@code "origen"} de la auditoría, que queda en {@code "entorno"}.
+     */
+    @Transactional
+    public LocalCreado darDeAltaDesdeElEntorno(DatosDeAltaDeLocal datos) {
+        return crear(datos, null, "entorno");
     }
 
     @Transactional
     @PreAuthorize("hasAuthority('local.crear')")
     public LocalCreado darDeAltaComoSuperadmin(UsuarioAutenticado operador, DatosDeAltaDeLocal datos) {
-        return crear(datos, operador.usuarioId());
+        return crear(datos, operador.usuarioId(), "superadmin");
     }
 
-    private LocalCreado crear(DatosDeAltaDeLocal datos, Long operadorId) {
+    private LocalCreado crear(DatosDeAltaDeLocal datos, Long operadorId, String origen) {
         validar(datos);
         if (usuarios.existeEmail(datos.email())) {
             throw new ReglaDeNegocioException(EMAIL_REPETIDO);
@@ -97,7 +106,7 @@ public class AltaDeLocalService {
                 UUID.randomUUID().toString()));
 
         auditor.registrar(local.getId(), operadorId == null ? gerente.getId() : operadorId,
-                "CREAR_LOCAL", "LOCAL", local.getId(), null, valores(local, gerente, operadorId));
+                "CREAR_LOCAL", "LOCAL", local.getId(), null, valores(local, gerente, origen));
         return new LocalCreado(local.getId(), local.getNombre(), local.getTokenStaff(), gerente.getId(),
                 gerente.getEmail());
     }
@@ -164,7 +173,7 @@ public class AltaDeLocalService {
     }
 
     /** Lo que queda en la auditoría del alta: nunca la contraseña ni su hash. */
-    private static Map<String, Object> valores(Local local, Usuario gerente, Long operadorId) {
+    private static Map<String, Object> valores(Local local, Usuario gerente, String origen) {
         Map<String, Object> delGerente = new LinkedHashMap<>();
         delGerente.put("id", gerente.getId());
         delGerente.put("nombre", gerente.getNombre());
@@ -173,7 +182,7 @@ public class AltaDeLocalService {
         valores.put("nombre", local.getNombre());
         valores.put("direccion", local.getDireccion());
         valores.put("gerente", delGerente);
-        valores.put("origen", operadorId == null ? "script" : "superadmin");
+        valores.put("origen", origen);
         return valores;
     }
 
