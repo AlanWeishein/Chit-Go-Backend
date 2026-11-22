@@ -349,7 +349,10 @@ Login del personal: `http://localhost:5173/staff/4eeea779-7b24-4857-909f-55f3f88
 
 En el MVP 1 no hay pantallas para dar de alta un local (decidido el 10/10): se hace con dos comandos
 del mismo back, con el perfil `script`. Cada uno corre una vez contra la base de `DB_URL` (por
-defecto, la del Compose) y termina. Nunca corren al levantar el back con `dev` ni en los tests.
+defecto, la del Compose) y termina. Nunca corren al levantar el back con `dev` ni en los tests. No
+hace falta que la base tenga las tablas: el script corre Flyway antes, como el back al arrancar, así
+que anda sobre una base recién creada. Se puede correr con Maven o adentro de Docker (ver "Con
+Docker").
 El primer local de una instalación nueva también se puede crear desde el `.env`, al arrancar el back
 (ver "Desde el `.env`", al final de esta sección).
 
@@ -382,7 +385,12 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=script" "-Dspring-boot.run.argum
 - Sale con 0 si salió bien (también si no estaba bloqueado), con 1 si no cambió nada por los datos y
   con 2 si el comando está mal escrito.
 - El back levanta unos segundos, solo en `127.0.0.1` y en un puerto libre, así que se puede correr con
-  el back andando. No corre Flyway: la base ya tiene que estar migrada.
+  el back andando.
+- **Flyway:** aplica lo que falte de `db/migration` y no carga ninguna semilla. Si la base ya tiene
+  una semilla aplicada (la `R__` de dev o la `V100` de la demo), no falla al validar: el perfil
+  ignora las migraciones aplicadas que no están en sus `locations`
+  (`spring.flyway.ignore-migration-patterns: "*:missing,*:future"`). Ojo: sobre una base de una
+  versión vieja del back, el script también la migra.
 - Los dos quedan en la auditoría del local nuevo: `CREAR_LOCAL` (entidad `LOCAL`) y
   `DESBLOQUEAR_GERENTE` (entidad `USUARIO`), con `"origen": "script"`. Como no hay nadie logueado,
   figura el mismo Gerente/Dueño. La auditoría no dice qué persona corrió el script.
@@ -406,6 +414,24 @@ DELETE FROM local WHERE id = @local;
 DELETE FROM usuario WHERE id = @gerente;
 COMMIT;
 ```
+
+### Con Docker
+
+En el repo de entrega no hace falta Maven: el script corre con la misma imagen del back, contra el
+MySQL del compose, con `docker compose run` y el perfil `script` (pisa el `SPRING_PROFILES_ACTIVE`
+del `.env`). Los argumentos van después del nombre del servicio. Si MySQL no está levantado, `run`
+lo levanta y espera su healthcheck. `--rm` borra el contenedor del comando al terminar.
+
+```powershell
+docker compose run --rm -e SPRING_PROFILES_ACTIVE=script back alta-local --local="La Plaza" --direccion="Av. Siempre Viva 742" --gerente="Dueño La Plaza" --email=dueno@laplaza.test
+docker compose run --rm -e SPRING_PROFILES_ACTIVE=script back desbloquear-gerente --email=dueno@laplaza.test
+```
+
+- La contraseña la pide por la consola, dos veces y sin mostrarla, porque `docker compose run` abre
+  una terminal. No hace falta `CHITGO_CONTRASENA`.
+- Con `-T` (sin terminal) y sin la variable, no la puede pedir: sale con 2 y no guarda nada.
+- Las variables `CHITGO_*` del primer local que estén en el `.env` no hacen nada con `script`.
+- La base puede estar recién creada: Flyway arma las tablas antes del alta.
 
 ### Desde el `.env`
 
