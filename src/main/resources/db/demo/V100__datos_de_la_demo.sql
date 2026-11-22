@@ -20,6 +20,10 @@
 --   la semilla de dev (db/dev/R__datos_de_prueba.sql), así sirven los casos de
 --   Postman y la tabla del README. Sus mesas siguen hasta la 20, sin mozo.
 --   Pizzería La Pala y La Colina, con su personal y 20 mesas cada uno.
+--   Las cartas de los cuatro locales (sección 7): La Esquina y El Puerto
+--   suman platos a los de dev, La Pala lleva una carta inventada y La Colina
+--   su carta real, entera (23 categorías, 189 platos). Cada local tiene dos
+--   destacados y dos platos fuera de carta.
 --
 -- CREDENCIALES (solo para la demo)
 --   Contraseña de todos los que entran con contraseña: Chitgo2026!
@@ -542,3 +546,647 @@ INSERT INTO turno (local_id, empleado_id, dia_semana, hora_inicio, hora_fin) VAL
     (@colina, @e_colina_5, 'VIE', '00:00:00', '23:59:00'),
     (@colina, @e_colina_5, 'SAB', '00:00:00', '23:59:00'),
     (@colina, @e_colina_5, 'DOM', '00:00:00', '23:59:00');
+
+
+-- ---------------------------------------------------------------------
+-- 7. Las cartas de los cuatro locales
+-- La Esquina y El Puerto suman platos a los de dev, que quedan con su
+-- nombre y su precio; sus categorías de dev solo cambian de orden.
+-- La Colina lleva su carta real, entera (chit-go-carta-la-colina en la
+-- bóveda): las descripciones son las del menú, y los platos que no la
+-- tienen van sin descripción. Sus etiquetas se deducen de los
+-- ingredientes que nombra el plato, no de la contaminación cruzada.
+-- Las etiquetas se cargan por nombre de plato, dentro de cada local.
+-- Las bebidas no llevan etiquetas.
+-- ---------------------------------------------------------------------
+
+-- 7.1 La Esquina. Los platos nuevos no llevan Sin TACC ni Sin lactosa,
+-- para que valgan los casos CF-01-04 a CF-01-06 de la mesa 1.
+
+INSERT INTO etiqueta (local_id, nombre) VALUES (@esquina, 'Para compartir');
+SET @et_esquina_para_compartir = LAST_INSERT_ID();
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@esquina, 'Entradas', 1);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@esquina, @cat, 'Empanada de carne cortada a cuchillo', 'Al horno, con carne cortada a cuchillo, cebolla, huevo y aceituna.', 3800.00, FALSE, TRUE),
+    (@esquina, @cat, 'Provoleta a la parrilla', 'Provolone a las brasas con orégano y aceite de oliva.', 9500.00, FALSE, TRUE),
+    (@esquina, @cat, 'Rabas', 'Anillas de calamar rebozadas, con limón.', 14000.00, FALSE, FALSE),
+    (@esquina, @cat, 'Tortilla de papas', 'Tortilla de papa y cebolla, jugosa, para dos.', 12000.00, FALSE, TRUE);
+
+-- Principales: viene de dev; se suman platos y pasa al orden 2
+UPDATE categoria_menu SET orden = 2 WHERE id = @cat_principales;
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@esquina, @cat_principales, 'Bife de chorizo con papas fritas', 'Bife de chorizo a la parrilla, de unos 400 g, con papas fritas.', 28000.00, TRUE, TRUE),
+    (@esquina, @cat_principales, 'Suprema a la suiza', 'Suprema de pollo con salsa blanca y queso gratinado, con puré.', 22000.00, FALSE, TRUE),
+    (@esquina, @cat_principales, 'Pollo al horno con papas', 'Cuarto de pollo al horno con papas y cebolla.', 19000.00, FALSE, TRUE),
+    (@esquina, @cat_principales, 'Matambre a la pizza', 'Matambre de ternera con salsa de tomate, muzzarella y orégano.', 21000.00, FALSE, TRUE),
+    (@esquina, @cat_principales, 'Guiso de lentejas', 'Lentejas con chorizo colorado, panceta y verduras. Plato de invierno.', 15000.00, FALSE, FALSE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@esquina, 'Pastas', 3);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@esquina, @cat, 'Ñoquis con tuco', 'Ñoquis de papa caseros con tuco de carne.', 14000.00, FALSE, TRUE),
+    (@esquina, @cat, 'Ravioles de ricota con fileto', 'Ravioles caseros de ricota y nuez con salsa fileto.', 15000.00, FALSE, TRUE),
+    (@esquina, @cat, 'Sorrentinos de jamón y queso', 'Sorrentinos caseros con salsa a elección: fileto, crema o rosa.', 16000.00, FALSE, TRUE),
+    (@esquina, @cat, 'Tallarines al pesto', 'Tallarines caseros con pesto de albahaca y nuez.', 13000.00, FALSE, TRUE),
+    (@esquina, @cat, 'Lasaña de verdura', 'Capas de pasta con acelga, ricota, salsa blanca y fileto.', 17000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@esquina, 'Guarniciones', 4);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@esquina, @cat, 'Papas fritas', 'Porción de papas fritas bastón.', 6500.00, FALSE, TRUE),
+    (@esquina, @cat, 'Puré de papas', 'Puré de papas con manteca.', 6000.00, FALSE, TRUE),
+    (@esquina, @cat, 'Ensalada de rúcula y tomate', 'Rúcula fresca y tomate, con aceite de oliva.', 6500.00, FALSE, TRUE),
+    (@esquina, @cat, 'Verduras grilladas', 'Zapallito, berenjena, morrón y cebolla a la plancha.', 8000.00, FALSE, TRUE);
+
+-- Postres: viene de dev; se suman platos y pasa al orden 5
+UPDATE categoria_menu SET orden = 5 WHERE id = @cat_postres;
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@esquina, @cat_postres, 'Panqueque con dulce de leche', 'Panqueque caliente relleno de dulce de leche.', 6000.00, FALSE, TRUE),
+    (@esquina, @cat_postres, 'Budín de pan', 'Budín de pan casero con caramelo y crema.', 6000.00, FALSE, TRUE),
+    (@esquina, @cat_postres, 'Ensalada de frutas', 'Frutas de estación cortadas, en su jugo.', 5500.00, FALSE, TRUE),
+    (@esquina, @cat_postres, 'Helado de dos bochas', 'Dos bochas a elección: chocolate, dulce de leche, vainilla o frutilla.', 6000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@esquina, 'Bebidas', 6);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@esquina, @cat, 'Agua mineral', 'Botella de 500 ml, con o sin gas.', 3500.00, FALSE, TRUE),
+    (@esquina, @cat, 'Gaseosa', 'Lata de 354 ml: cola, lima limón o naranja.', 4500.00, FALSE, TRUE),
+    (@esquina, @cat, 'Limonada', 'Jarra de limonada exprimida, de 1 litro.', 7000.00, FALSE, TRUE),
+    (@esquina, @cat, 'Cerveza tirada', 'Pinta de 500 ml, rubia o roja.', 6000.00, FALSE, TRUE),
+    (@esquina, @cat, 'Copa de vino de la casa', 'Malbec o blanco de la casa.', 5000.00, FALSE, TRUE);
+
+-- Para compartir: 3 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @esquina, id, @et_esquina_para_compartir FROM plato WHERE local_id = @esquina AND nombre IN (
+    'Provoleta a la parrilla',
+    'Rabas',
+    'Tortilla de papas');
+
+-- Vegano: 3 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @esquina, id, @et_vegano FROM plato WHERE local_id = @esquina AND nombre IN (
+    'Papas fritas',
+    'Ensalada de rúcula y tomate',
+    'Verduras grilladas');
+
+-- 7.2 El Puerto
+
+INSERT INTO etiqueta (local_id, nombre) VALUES (@puerto, 'Sin TACC');
+SET @et_puerto_sin_tacc = LAST_INSERT_ID();
+INSERT INTO etiqueta (local_id, nombre) VALUES (@puerto, 'Vegano');
+SET @et_puerto_vegano = LAST_INSERT_ID();
+INSERT INTO etiqueta (local_id, nombre) VALUES (@puerto, 'Sin lactosa');
+SET @et_puerto_sin_lactosa = LAST_INSERT_ID();
+INSERT INTO etiqueta (local_id, nombre) VALUES (@puerto, 'Con mariscos');
+SET @et_puerto_con_mariscos = LAST_INSERT_ID();
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@puerto, 'Entradas', 1);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@puerto, @cat, 'Rabas a la romana', 'Anillas de calamar rebozadas, con limón y alioli.', 16000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Cornalitos fritos', 'Porción de cornalitos fritos con limón.', 12000.00, FALSE, FALSE),
+    (@puerto, @cat, 'Mejillones a la provenzal', 'Mejillones al vapor con ajo, perejil y vino blanco.', 15000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Langostinos al ajillo', 'Langostinos salteados en aceite de oliva, ajo y ají.', 18000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Empanada de atún', 'Al horno, con atún, morrón, cebolla y huevo.', 4000.00, FALSE, TRUE);
+
+-- Principales: viene de dev; se suman platos y pasa al orden 2
+UPDATE categoria_menu SET orden = 2 WHERE id = @cat_puerto;
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@puerto, @cat_puerto, 'Merluza a la romana con puré', 'Filet de merluza rebozado, con puré de papas.', 19000.00, FALSE, TRUE),
+    (@puerto, @cat_puerto, 'Salmón rosado grillado con vegetales', 'Salmón rosado a la plancha con vegetales grillados.', 32000.00, TRUE, TRUE),
+    (@puerto, @cat_puerto, 'Abadejo a la manteca negra', 'Filet de abadejo a la plancha con manteca negra y alcaparras, con papas al natural.', 24000.00, FALSE, TRUE),
+    (@puerto, @cat_puerto, 'Paella de mariscos', 'Arroz con calamar, mejillones, langostinos y azafrán. Para dos.', 42000.00, TRUE, TRUE),
+    (@puerto, @cat_puerto, 'Cazuela de mariscos', 'Mariscos y pescado en salsa de tomate y vino blanco, con pan tostado.', 30000.00, FALSE, TRUE),
+    (@puerto, @cat_puerto, 'Trucha a la parrilla', 'Trucha entera a la parrilla con limón y hierbas.', 28000.00, FALSE, FALSE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@puerto, 'Pastas', 3);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@puerto, @cat, 'Sorrentinos de salmón con salsa rosa', 'Sorrentinos caseros rellenos de salmón y ricota.', 19000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Tallarines con frutos de mar', 'Tallarines caseros con calamar, mejillones y langostinos en salsa de tomate.', 22000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Ñoquis de papa al fileto', 'Ñoquis de papa caseros con salsa fileto.', 14000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Raviolones de calabaza con manteca y salvia', 'Raviolones caseros de calabaza y queso, con manteca y salvia.', 16000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@puerto, 'Guarniciones', 4);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@puerto, @cat, 'Papas fritas', 'Porción de papas fritas bastón.', 6500.00, FALSE, TRUE),
+    (@puerto, @cat, 'Puré de papas', 'Puré de papas con manteca.', 6000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Ensalada mixta', 'Lechuga, tomate y cebolla.', 6000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Vegetales grillados', 'Zapallito, berenjena, morrón y cebolla a la plancha.', 8000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@puerto, 'Postres', 5);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@puerto, @cat, 'Flan con dulce de leche', 'Flan casero con dulce de leche.', 6000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Helado artesanal', 'Dos bochas a elección.', 6500.00, FALSE, TRUE),
+    (@puerto, @cat, 'Ensalada de frutas', 'Frutas de estación cortadas, en su jugo.', 5500.00, FALSE, TRUE),
+    (@puerto, @cat, 'Tiramisú', 'Vainillas con café, crema de mascarpone y cacao.', 7500.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@puerto, 'Bebidas', 6);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@puerto, @cat, 'Agua mineral', 'Botella de 500 ml, con o sin gas.', 3500.00, FALSE, TRUE),
+    (@puerto, @cat, 'Gaseosa', 'Lata de 354 ml: cola, lima limón o naranja.', 4500.00, FALSE, TRUE),
+    (@puerto, @cat, 'Agua saborizada', 'Botella de 500 ml: pomelo, naranja o limón.', 4000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Cerveza artesanal', 'Pinta de 500 ml: rubia, roja o negra.', 7000.00, FALSE, TRUE),
+    (@puerto, @cat, 'Copa de vino blanco', 'Sauvignon blanc o torrontés.', 5500.00, FALSE, TRUE);
+
+-- Con mariscos: 6 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @puerto, id, @et_puerto_con_mariscos FROM plato WHERE local_id = @puerto AND nombre IN (
+    'Rabas a la romana',
+    'Mejillones a la provenzal',
+    'Langostinos al ajillo',
+    'Paella de mariscos',
+    'Cazuela de mariscos',
+    'Tallarines con frutos de mar');
+
+-- Sin TACC: 11 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @puerto, id, @et_puerto_sin_tacc FROM plato WHERE local_id = @puerto AND nombre IN (
+    'Mejillones a la provenzal',
+    'Langostinos al ajillo',
+    'Salmón rosado grillado con vegetales',
+    'Abadejo a la manteca negra',
+    'Paella de mariscos',
+    'Trucha a la parrilla',
+    'Puré de papas',
+    'Ensalada mixta',
+    'Vegetales grillados',
+    'Flan con dulce de leche',
+    'Ensalada de frutas');
+
+-- Sin lactosa: 9 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @puerto, id, @et_puerto_sin_lactosa FROM plato WHERE local_id = @puerto AND nombre IN (
+    'Mejillones a la provenzal',
+    'Langostinos al ajillo',
+    'Salmón rosado grillado con vegetales',
+    'Paella de mariscos',
+    'Trucha a la parrilla',
+    'Papas fritas',
+    'Ensalada mixta',
+    'Vegetales grillados',
+    'Ensalada de frutas');
+
+-- Vegano: 4 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @puerto, id, @et_puerto_vegano FROM plato WHERE local_id = @puerto AND nombre IN (
+    'Papas fritas',
+    'Ensalada mixta',
+    'Vegetales grillados',
+    'Ensalada de frutas');
+
+-- 7.3 Pizzería La Pala
+
+INSERT INTO etiqueta (local_id, nombre) VALUES (@pala, 'Sin TACC');
+SET @et_pala_sin_tacc = LAST_INSERT_ID();
+INSERT INTO etiqueta (local_id, nombre) VALUES (@pala, 'Vegano');
+SET @et_pala_vegano = LAST_INSERT_ID();
+INSERT INTO etiqueta (local_id, nombre) VALUES (@pala, 'Sin lactosa');
+SET @et_pala_sin_lactosa = LAST_INSERT_ID();
+INSERT INTO etiqueta (local_id, nombre) VALUES (@pala, 'Picante');
+SET @et_pala_picante = LAST_INSERT_ID();
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@pala, 'Entradas', 1);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@pala, @cat, 'Fainá', 'Porción de fainá de harina de garbanzo.', 3500.00, FALSE, TRUE),
+    (@pala, @cat, 'Provoleta con orégano', 'Provolone al horno de barro con orégano y aceite de oliva.', 9000.00, FALSE, TRUE),
+    (@pala, @cat, 'Bastones de muzzarella', 'Seis bastones de muzzarella rebozados, con salsa de tomate.', 8500.00, FALSE, TRUE),
+    (@pala, @cat, 'Papas fritas', 'Porción de papas fritas bastón.', 6500.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@pala, 'Pizzas clásicas', 2);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@pala, @cat, 'Pizza muzzarella', 'Salsa de tomate, muzzarella, orégano y aceitunas. Ocho porciones.', 14000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza napolitana', 'Muzzarella, rodajas de tomate, ajo y perejil.', 16000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza fugazzeta', 'Rellena de muzzarella, cubierta de cebolla.', 16000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza fugazza', 'Cebolla, orégano y aceite de oliva, sin queso.', 12000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza de jamón y morrones', 'Muzzarella, jamón cocido y morrones asados.', 17000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza calabresa', 'Muzzarella y longaniza calabresa con ají molido.', 17000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza muzzarella sin TACC', 'Masa sin TACC, salsa de tomate y muzzarella, hecha aparte.', 17000.00, TRUE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@pala, 'Pizzas especiales', 3);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@pala, @cat, 'Pizza La Pala', 'La de la casa: muzzarella, jamón crudo, rúcula y parmesano.', 22000.00, TRUE, TRUE),
+    (@pala, @cat, 'Pizza cuatro quesos', 'Muzzarella, roquefort, provolone y parmesano.', 20000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza margherita', 'Salsa de tomate, muzzarella fresca y albahaca.', 17000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza de provolone y tomates secos', 'Muzzarella, provolone, tomates secos y orégano.', 19000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza vegana de vegetales asados', 'Salsa de tomate, berenjena, zapallito, morrón y cebolla asados, sin queso.', 18000.00, FALSE, TRUE),
+    (@pala, @cat, 'Pizza diavola', 'Muzzarella, salame picante y ají.', 19000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@pala, 'Empanadas', 4);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@pala, @cat, 'Empanada de carne cortada a cuchillo', 'Al horno de barro, con carne cortada a cuchillo, cebolla y huevo.', 3800.00, FALSE, TRUE),
+    (@pala, @cat, 'Empanada de jamón y queso', 'Al horno de barro, con jamón cocido y muzzarella.', 3800.00, FALSE, TRUE),
+    (@pala, @cat, 'Empanada de humita', 'Choclo, salsa blanca y queso. De temporada.', 3800.00, FALSE, FALSE),
+    (@pala, @cat, 'Empanada caprese', 'Muzzarella, tomate y albahaca.', 3800.00, FALSE, TRUE),
+    (@pala, @cat, 'Empanada de carne picante', 'Carne cortada a cuchillo con ají molido.', 3800.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@pala, 'Postres', 5);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@pala, @cat, 'Flan casero', 'Flan casero con dulce de leche o crema.', 5500.00, FALSE, TRUE),
+    (@pala, @cat, 'Helado de un cuarto kilo', 'Hasta tres gustos.', 9000.00, FALSE, TRUE),
+    (@pala, @cat, 'Tiramisú', 'Vainillas con café, crema de mascarpone y cacao.', 7000.00, FALSE, FALSE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@pala, 'Bebidas', 6);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@pala, @cat, 'Agua mineral', 'Botella de 500 ml, con o sin gas.', 3500.00, FALSE, TRUE),
+    (@pala, @cat, 'Gaseosa de 1,5 L', 'Cola, lima limón o naranja.', 7500.00, FALSE, TRUE),
+    (@pala, @cat, 'Cerveza de 1 L', 'Botella retornable, rubia o negra.', 9000.00, FALSE, TRUE),
+    (@pala, @cat, 'Copa de vino de la casa', 'Malbec o blanco de la casa.', 5000.00, FALSE, TRUE);
+
+-- Vegano: 4 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @pala, id, @et_pala_vegano FROM plato WHERE local_id = @pala AND nombre IN (
+    'Fainá',
+    'Papas fritas',
+    'Pizza fugazza',
+    'Pizza vegana de vegetales asados');
+
+-- Sin lactosa: 4 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @pala, id, @et_pala_sin_lactosa FROM plato WHERE local_id = @pala AND nombre IN (
+    'Fainá',
+    'Papas fritas',
+    'Pizza fugazza',
+    'Pizza vegana de vegetales asados');
+
+-- Picante: 3 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @pala, id, @et_pala_picante FROM plato WHERE local_id = @pala AND nombre IN (
+    'Pizza calabresa',
+    'Pizza diavola',
+    'Empanada de carne picante');
+
+-- Sin TACC: 2 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @pala, id, @et_pala_sin_tacc FROM plato WHERE local_id = @pala AND nombre IN (
+    'Pizza muzzarella sin TACC',
+    'Flan casero');
+
+-- 7.4 La Colina: 23 categorías y 189 platos, en el orden del menú
+
+INSERT INTO etiqueta (local_id, nombre) VALUES (@colina, 'Sin TACC');
+SET @et_colina_sin_tacc = LAST_INSERT_ID();
+INSERT INTO etiqueta (local_id, nombre) VALUES (@colina, 'Vegano');
+SET @et_colina_vegano = LAST_INSERT_ID();
+INSERT INTO etiqueta (local_id, nombre) VALUES (@colina, 'Sin lactosa');
+SET @et_colina_sin_lactosa = LAST_INSERT_ID();
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Entradas', 1);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Empanada de carne', NULL, 4000.00, FALSE, TRUE),
+    (@colina, @cat, 'Berenjenas al escabeche', NULL, 5900.00, FALSE, TRUE),
+    (@colina, @cat, 'Matambre arrollado casero', NULL, 6900.00, FALSE, TRUE),
+    (@colina, @cat, 'Lengua a la vinagreta', NULL, 5700.00, FALSE, TRUE),
+    (@colina, @cat, 'Provoleta clásica', NULL, 10000.00, FALSE, TRUE),
+    (@colina, @cat, 'Provoleta La Colina', 'Nuestra provoleta a las brasas con rúcula fresca, tomates confitados y lluvia de queso parmesano.', 12000.00, TRUE, TRUE),
+    (@colina, @cat, 'Mayonesa de ave', NULL, 9000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Ensaladas', 2);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Zanahoria y huevo', NULL, 6000.00, FALSE, TRUE),
+    (@colina, @cat, 'Rúcula y parmesano', NULL, 7500.00, FALSE, TRUE),
+    (@colina, @cat, 'Ensalada Mixta', 'Lechuga fresca, tomates y cebolla.', 7500.00, FALSE, TRUE),
+    (@colina, @cat, 'Ensalada Completa', 'Mezcla de lechuga, tomate, huevo duro, zanahoria, choclo, arroz, jamón cocido y dados de queso.', 11500.00, FALSE, TRUE),
+    (@colina, @cat, 'Ensalada César', 'Tiras de pollo a la plancha, lechuga, queso parmesano, croutones crocantes y salsa César.', 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Ensalada La Colina', 'Colchón de hojas verdes, langostinos, tomates secos y champiñones en su vinagreta.', 20000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Guarniciones', 3);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Tortilla clásica', NULL, 14000.00, FALSE, TRUE),
+    (@colina, @cat, 'Papas al natural', NULL, 6800.00, FALSE, TRUE),
+    (@colina, @cat, 'Papas fritas clásicas', NULL, 6800.00, FALSE, TRUE),
+    (@colina, @cat, 'Papas fritas con cheddar', NULL, 7000.00, FALSE, TRUE),
+    (@colina, @cat, 'Papas fritas con cheddar, bacon y verdeo', NULL, 7200.00, FALSE, TRUE),
+    (@colina, @cat, 'Puré de papas', NULL, 6800.00, FALSE, TRUE),
+    (@colina, @cat, 'Puré mixto', NULL, 7000.00, FALSE, TRUE),
+    (@colina, @cat, 'Arroz blanco', NULL, 6000.00, FALSE, TRUE),
+    (@colina, @cat, 'Ensalada rusa', NULL, 7000.00, FALSE, TRUE),
+    (@colina, @cat, 'Vegetales asados', NULL, 9000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Minutas', 4);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Milanesa de ternera clásica', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 26000.00, FALSE, TRUE),
+    (@colina, @cat, 'Milanesa de ternera napolitana', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 30000.00, FALSE, TRUE),
+    (@colina, @cat, 'Milanesa de ternera a caballo', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 30000.00, FALSE, TRUE),
+    (@colina, @cat, 'Milanesa de pollo clásica', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 22000.00, FALSE, TRUE),
+    (@colina, @cat, 'Milanesa de pollo napolitana', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 26000.00, FALSE, TRUE),
+    (@colina, @cat, 'Milanesa de pollo a caballo', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 26000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Pastas', 5);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Tallarines', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Canelones de verdura', NULL, 20000.00, FALSE, TRUE),
+    (@colina, @cat, 'Lasaña', NULL, 22000.00, FALSE, TRUE),
+    (@colina, @cat, 'Sorrentinos de jamón y queso', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Ravioles de verdura', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Ñoquis', NULL, 16000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Nuestras salsas', 6);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Filetto', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Salsa Blanca', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Salsa Rosa', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Crema', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Bolognesa', NULL, 8000.00, FALSE, TRUE),
+    (@colina, @cat, 'Pesto', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Parisienne', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Al Champiñon', NULL, 7500.00, FALSE, TRUE),
+    (@colina, @cat, 'Langostinos', NULL, 8500.00, FALSE, TRUE),
+    (@colina, @cat, 'Estofado de carne', NULL, 9000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Cocina', 7);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Pollo al Champiñón', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 24000.00, FALSE, TRUE),
+    (@colina, @cat, 'Pollo al Verdeo', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 24000.00, FALSE, TRUE),
+    (@colina, @cat, 'Pollo a la Mostaza', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 24000.00, FALSE, TRUE),
+    (@colina, @cat, 'Bife a la Pimienta', 'Lomo a la pimienta con papines a la crema y hojas verdes.', 36000.00, FALSE, TRUE),
+    (@colina, @cat, 'Bife al Champiñón', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 36000.00, FALSE, TRUE),
+    (@colina, @cat, 'Bife al Verdeo', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 36000.00, FALSE, TRUE),
+    (@colina, @cat, 'Bife a la Mostaza', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 36000.00, FALSE, TRUE),
+    (@colina, @cat, 'Bife a la Riojana', 'Con guarnición a elección: papas fritas, puré, ensalada fresca o arroz.', 36000.00, FALSE, TRUE),
+    (@colina, @cat, 'Bife de chorizo a las finas hierbas', 'Bife de chorizo con papas rústicas cubierto en salsa de finas hierbas.', 38000.00, FALSE, TRUE),
+    (@colina, @cat, 'Ojo de Bife La Colina', 'Ojo de bife con su salsa de fondo de cocción y papas gratinadas.', 34000.00, FALSE, TRUE),
+    (@colina, @cat, 'Risotto de Hongos', 'Cremoso risotto de arroz arborio con hongos salteados, queso parmesano, manteca y reducción de vino blanco.', 26000.00, FALSE, TRUE),
+    (@colina, @cat, 'Risotto de Pollo', 'Cremoso risotto de arroz arborio con tiernos trozos de pollo dorados, queso parmesano, manteca y reducción de vino blanco.', 26000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Menú ejecutivo', 8);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Menú ejecutivo', 'Entrada + plato principal + bebida o copa de vino + postre o café. Miércoles a viernes al mediodía.', 30000.00, FALSE, FALSE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Al fuego', 9);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Mollejas', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Chinchulin', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Chorizo', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Riñon', NULL, 12000.00, FALSE, TRUE),
+    (@colina, @cat, 'Riñon a la provenzal', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Morcilla', NULL, 4500.00, FALSE, TRUE),
+    (@colina, @cat, 'Asado de tira', NULL, 32000.00, FALSE, TRUE),
+    (@colina, @cat, 'Vacío', NULL, 32000.00, FALSE, TRUE),
+    (@colina, @cat, 'Ojo de bife', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Entraña', NULL, 34000.00, FALSE, TRUE),
+    (@colina, @cat, 'Bife de chorizo', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Pollo ¼ porción', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Matambre de cerdo', NULL, 24000.00, FALSE, TRUE),
+    (@colina, @cat, 'Asado al asador', NULL, 36000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Parrillada libre', 10);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Parrillada libre', 'Entrada (empanada de carne), parrillada con guarnición (asado, pollo, vacío, matambre, chorizo, morcilla y achuras) y postre o café, 1 por persona.', 45000.00, TRUE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Menú infantil', 11);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Nuggets de pollo con guarnición', 'Guarnición: papas fritas o puré.', 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Milanesa con guarnición', 'Guarnición: papas fritas o puré.', 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Tallarines con salsa', 'Fideos caseros con salsa filetto, salsa blanca o con manteca y queso.', 18000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Postres', 12);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Flan Casero', NULL, 6000.00, FALSE, TRUE),
+    (@colina, @cat, 'Tiramisú', NULL, 7000.00, FALSE, TRUE),
+    (@colina, @cat, 'Queso y dulce', NULL, 5000.00, FALSE, TRUE),
+    (@colina, @cat, 'Ensalada de frutas', NULL, 5000.00, FALSE, TRUE),
+    (@colina, @cat, 'Copa helada', NULL, 7000.00, FALSE, TRUE),
+    (@colina, @cat, 'Bombón escocés', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Budín de pan', NULL, 7000.00, FALSE, TRUE),
+    (@colina, @cat, 'Almendrado', NULL, 6500.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Cafetería', 13);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Té', NULL, 3500.00, FALSE, TRUE),
+    (@colina, @cat, 'Americano', NULL, 4000.00, FALSE, TRUE),
+    (@colina, @cat, 'Café con leche', NULL, 4200.00, FALSE, TRUE),
+    (@colina, @cat, 'Lágrima', NULL, 4200.00, FALSE, TRUE),
+    (@colina, @cat, 'Capuchino', NULL, 5000.00, FALSE, TRUE),
+    (@colina, @cat, 'Submarino', NULL, 5500.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Jarras', 14);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Limonada clásica', NULL, 9000.00, FALSE, TRUE),
+    (@colina, @cat, 'Limonada menta y jengibre', NULL, 9000.00, FALSE, TRUE),
+    (@colina, @cat, 'Limonada de frutos rojos', NULL, 9000.00, FALSE, TRUE),
+    (@colina, @cat, 'Naranjada', NULL, 8000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Sin alcohol', 15);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Agua con gas / sin gas', NULL, 4000.00, FALSE, TRUE),
+    (@colina, @cat, 'Saborizadas', NULL, 4500.00, FALSE, TRUE),
+    (@colina, @cat, 'Gaseosas Linea Coca-Cola', NULL, 5000.00, FALSE, TRUE),
+    (@colina, @cat, 'Vaso de jugo exprimido', NULL, 4500.00, FALSE, TRUE),
+    (@colina, @cat, 'Cerveza 0.0% 330cc', NULL, 7500.00, FALSE, TRUE),
+    (@colina, @cat, 'Cerveza 0.0% 710cc', NULL, 12000.00, FALSE, TRUE),
+    (@colina, @cat, 'Energizante', NULL, 6000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Cervezas', 16);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Corona Botella 710cc', NULL, 12000.00, FALSE, TRUE),
+    (@colina, @cat, 'Corona Botella 330cc', NULL, 9000.00, FALSE, TRUE),
+    (@colina, @cat, 'Stella Artois Botella 330cc', NULL, 9000.00, FALSE, TRUE),
+    (@colina, @cat, 'Stella Artois Botella 975cc', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Stella Artois Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Stella Artois Lata 710cc', NULL, 12000.00, FALSE, TRUE),
+    (@colina, @cat, 'Stella Artois Noire Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Stella Artois Noire Botella 975cc', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Andes origen rubia Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Andes origen rubia Botella 975cc', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Andes origen roja Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Patagonia Amber Lager Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Patagonia Amber Lager Botella 730cc', NULL, 12000.00, FALSE, TRUE),
+    (@colina, @cat, 'Patagonia IPA 24.7 Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Imperial Gold Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Imperial Gold Botella 1L', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Imperial Botella 1L', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Imperial Stout Botella 1L', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Heineken Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Heineken Botella 1L', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Warsteiner Lata 473cc', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Warsteiner Botella 1L', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Miller Botella 330cc', NULL, 9000.00, FALSE, TRUE),
+    (@colina, @cat, 'Miller Botella 1L', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Quilmes Lata 710cc', NULL, 12000.00, FALSE, TRUE),
+    (@colina, @cat, 'Quilmes Botella 1L', NULL, 15000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Vinos recomendados', 17);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Hermandad Malbec', NULL, 42000.00, FALSE, TRUE),
+    (@colina, @cat, 'Los Intocables Malbec / Cabernet', NULL, 32000.00, FALSE, TRUE),
+    (@colina, @cat, 'Los Helechos Malbec / Cabernet', NULL, 40000.00, FALSE, TRUE),
+    (@colina, @cat, 'La Iride Malbec', NULL, 30000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Tintos Malbec', 18);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Vino de la casa Malbec', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Angelica Zapata Malbec', NULL, 45000.00, FALSE, TRUE),
+    (@colina, @cat, 'Alta Vista Terroir Malbec', NULL, 22500.00, FALSE, TRUE),
+    (@colina, @cat, 'Doña Paula Malbec', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Fin del Mundo Malbec', NULL, 24000.00, FALSE, TRUE),
+    (@colina, @cat, 'Salentein Reserva Malbec', NULL, 25000.00, FALSE, TRUE),
+    (@colina, @cat, 'Salentein Reserva Malbec 375ml', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Salentein Numina Malbec', NULL, 38000.00, FALSE, TRUE),
+    (@colina, @cat, 'La Linda Malbec', NULL, 22500.00, FALSE, TRUE),
+    (@colina, @cat, 'La Final Malbec', NULL, 20000.00, FALSE, TRUE),
+    (@colina, @cat, 'Escorihuela Gascon Gran Reserva Malbec', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Las Perdices Reserva Malbec', NULL, 30000.00, FALSE, TRUE),
+    (@colina, @cat, 'Las Perdices Reserva Malbec 375ml', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Casillero del Diablo Malbec', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Emilia Nieto Senetiner Malbec', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Zuccardi Seria A Malbec', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Zuccardi Seria Q Malbec', NULL, 35000.00, FALSE, TRUE),
+    (@colina, @cat, 'Malcriado Malbec', NULL, 75000.00, FALSE, FALSE),
+    (@colina, @cat, 'Luigi Bosca Malbec', NULL, 32000.00, FALSE, TRUE),
+    (@colina, @cat, 'Los Intocables Malbec', NULL, 32000.00, FALSE, TRUE),
+    (@colina, @cat, 'Mosquita Muerta Black Malbec', NULL, 45000.00, FALSE, TRUE),
+    (@colina, @cat, 'Postales Roble Malbec', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Trumpeter Malbec', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Septima Prestige Malbec', NULL, 45000.00, FALSE, TRUE),
+    (@colina, @cat, 'Rutini Malbec', NULL, 48000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Tintos Cabernet', 19);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Vino de la casa Cabernet', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Alta Vista Terroir Cabernet', NULL, 22500.00, FALSE, TRUE),
+    (@colina, @cat, 'Doña Paula Cabernet', NULL, 25000.00, FALSE, TRUE),
+    (@colina, @cat, 'Fin del Mundo Reserva Cabernet', NULL, 24000.00, FALSE, TRUE),
+    (@colina, @cat, 'Salentein Reserva Cabernet', NULL, 25000.00, FALSE, TRUE),
+    (@colina, @cat, 'Salentein Reserva Cabernet 375ml', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Salentein Numina Cabernet', NULL, 38000.00, FALSE, TRUE),
+    (@colina, @cat, 'Salentein Numina Gran Corte', 'Unión con Malbec.', 45000.00, FALSE, TRUE),
+    (@colina, @cat, 'Escorihuela Gascon Gran Reserva Cabernet', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Las Perdices Reserva Cabernet', NULL, 30000.00, FALSE, TRUE),
+    (@colina, @cat, 'Las Perdices Reserva Cabernet 375ml', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Emilia Nieto Senetiner Cabernet', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Los Intocables Cabernet', NULL, 32000.00, FALSE, TRUE),
+    (@colina, @cat, 'Mosquita Muerta Black Cabernet', NULL, 45000.00, FALSE, TRUE),
+    (@colina, @cat, 'Rutini Cabernet', 'Unión con Malbec.', 42000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Blancos', 20);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Vino de la casa blanco', NULL, 15000.00, FALSE, TRUE),
+    (@colina, @cat, 'Cosecha Tardía Norton Dulce', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Santa Julia Chenin Dulce', NULL, 18000.00, FALSE, TRUE),
+    (@colina, @cat, 'Las Perdices Sauvignon Blanc', NULL, 20000.00, FALSE, TRUE),
+    (@colina, @cat, 'Las Perdices Reserva Sauvignon Blanc', NULL, 32000.00, FALSE, TRUE),
+    (@colina, @cat, 'Fuego Blanco Sauvignon Blanc', NULL, 25000.00, FALSE, TRUE),
+    (@colina, @cat, 'Gran Sombrero Chardonnay', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Doña Paula Sauvignon Blanc', NULL, 24000.00, FALSE, TRUE),
+    (@colina, @cat, 'Trumpeter Sauvignon Blanc', NULL, 24000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Rosados', 21);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Casa de Herrero Rosé', NULL, 22000.00, FALSE, TRUE),
+    (@colina, @cat, 'La Linda Rosé', NULL, 22500.00, FALSE, TRUE),
+    (@colina, @cat, 'Luigi Bosca Rosé', NULL, 32000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Espumantes', 22);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Salentein Extra Brut', NULL, 26000.00, FALSE, TRUE),
+    (@colina, @cat, 'Escorihuela Gascon Extra Brut', NULL, 28000.00, FALSE, TRUE),
+    (@colina, @cat, 'Chandon Delice', NULL, 29000.00, FALSE, TRUE);
+
+INSERT INTO categoria_menu (local_id, nombre, orden) VALUES (@colina, 'Tragos', 23);
+SET @cat = LAST_INSERT_ID();
+INSERT INTO plato (local_id, categoria_id, nombre, descripcion, precio, destacado, activo) VALUES
+    (@colina, @cat, 'Fernet Branca con Cola', NULL, 7000.00, FALSE, TRUE),
+    (@colina, @cat, 'Campari con naranja', NULL, 6500.00, FALSE, TRUE),
+    (@colina, @cat, 'Gancia', NULL, 6500.00, FALSE, TRUE);
+
+-- Sin TACC: 28 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @colina, id, @et_colina_sin_tacc FROM plato WHERE local_id = @colina AND nombre IN (
+    'Berenjenas al escabeche',
+    'Lengua a la vinagreta',
+    'Provoleta clásica',
+    'Provoleta La Colina',
+    'Zanahoria y huevo',
+    'Rúcula y parmesano',
+    'Ensalada Mixta',
+    'Ensalada La Colina',
+    'Tortilla clásica',
+    'Papas al natural',
+    'Puré de papas',
+    'Puré mixto',
+    'Arroz blanco',
+    'Vegetales asados',
+    'Mollejas',
+    'Chinchulin',
+    'Riñon',
+    'Riñon a la provenzal',
+    'Asado de tira',
+    'Vacío',
+    'Ojo de bife',
+    'Entraña',
+    'Bife de chorizo',
+    'Pollo ¼ porción',
+    'Matambre de cerdo',
+    'Asado al asador',
+    'Flan Casero',
+    'Ensalada de frutas');
+
+-- Vegano: 5 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @colina, id, @et_colina_vegano FROM plato WHERE local_id = @colina AND nombre IN (
+    'Berenjenas al escabeche',
+    'Ensalada Mixta',
+    'Papas al natural',
+    'Vegetales asados',
+    'Ensalada de frutas');
+
+-- Sin lactosa: 23 platos
+INSERT INTO plato_etiqueta (local_id, plato_id, etiqueta_id)
+SELECT @colina, id, @et_colina_sin_lactosa FROM plato WHERE local_id = @colina AND nombre IN (
+    'Berenjenas al escabeche',
+    'Lengua a la vinagreta',
+    'Mayonesa de ave',
+    'Zanahoria y huevo',
+    'Ensalada Mixta',
+    'Ensalada La Colina',
+    'Tortilla clásica',
+    'Papas al natural',
+    'Ensalada rusa',
+    'Vegetales asados',
+    'Mollejas',
+    'Chinchulin',
+    'Riñon',
+    'Riñon a la provenzal',
+    'Asado de tira',
+    'Vacío',
+    'Ojo de bife',
+    'Entraña',
+    'Bife de chorizo',
+    'Pollo ¼ porción',
+    'Matambre de cerdo',
+    'Asado al asador',
+    'Ensalada de frutas');
