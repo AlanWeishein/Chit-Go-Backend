@@ -1,0 +1,6 @@
+# Perfil demo: además de las migraciones, carga una sola vez la semilla de db/demo (V100), la de la
+# entrega. No se combina con dev: si se juntaran, Flyway correría las dos semillas.
+# Si la base ya tiene locales y no tiene la V100, el back no arranca (FrenoDeLaSemillaDemo).
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo
