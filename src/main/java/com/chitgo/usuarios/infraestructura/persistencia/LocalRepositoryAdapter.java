@@ -40,4 +40,9 @@ class LocalRepositoryAdapter implements LocalRepository {
     public Local guardar(Local local) {
         return jpa.saveAndFlush(local);
     }
+
+    @Override
+    public boolean hayLocales() {
+        return jpa.count() > 0;
+    }
 }

@@ -127,6 +127,21 @@ class AltaDeLocalServiceTest {
     }
 
     @Test
+    void elAltaDesdeElEntornoQuedaConSuPropioOrigen() {
+        LocalCreado creado = servicio.darDeAltaDesdeElEntorno(datos("La Prueba", "Calle 1", "Dueño La Prueba", EMAIL,
+                CONTRASENA));
+
+        List<Map<String, Object>> registros = auditoriaNueva();
+        assertThat(registros).hasSize(1);
+        assertThat(registros.getFirst().get("usuario_id")).isEqualTo(creado.gerenteId());
+        assertThat(registros.getFirst().get("accion")).isEqualTo("CREAR_LOCAL");
+        assertThat((String) registros.getFirst().get("valor_nuevo")).contains("\"origen\": \"entorno\"")
+                .doesNotContain("\"script\"", CONTRASENA);
+        assertThat(jdbc.queryForObject("SELECT debe_cambiar_credencial FROM usuario WHERE id = ?", Boolean.class,
+                creado.gerenteId())).isTrue();
+    }
+
+    @Test
     void elGerenteNuevoEntraConLaProvisoriaYTieneQueCambiarla() throws Exception {
         servicio.darDeAlta(datos("La Prueba", null, "Dueño La Prueba", EMAIL, CONTRASENA));
 

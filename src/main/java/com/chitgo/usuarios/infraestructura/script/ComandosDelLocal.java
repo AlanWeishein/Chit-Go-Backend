@@ -71,7 +71,7 @@ class ComandosDelLocal implements ApplicationRunner {
     @Autowired
     ComandosDelLocal(AltaDeLocalService servicio, SuperadminOperativoService superadmins,
             ConfigurableApplicationContext contexto,
-            @Value("${chitgo.script.url-front:http://localhost:5173}") String urlFront) {
+            @Value("${chitgo.url-front:http://localhost:5173}") String urlFront) {
         this(servicio, superadmins, contexto, urlFront, ComandosDelLocal::contrasenaDelEntornoOLaConsola, System.out);
     }
 

@@ -23,6 +23,18 @@ server:
   port: 8080
 
 chitgo:
+  # El front, para armar la URL del login del personal (<url-front>/staff/<token_staff>) que muestran el
+  # alta del script y el primer local del .env.
+  url-front: ${URL_FRONT:http://localhost:5173}
+  # El primer local y su Gerente/Dueño, creados al arrancar sobre una base sin locales (ST-32). Van las cinco
+  # o ninguna: con algunas sí y otras no, el back no arranca. La contraseña es provisoria y nunca va al log.
+  # Lo hace PrimerLocalDelEntorno; cómo se usa está en el README, en "Alta de un local".
+  primer-local:
+    nombre: ${CHITGO_LOCAL_NOMBRE:}
+    direccion: ${CHITGO_LOCAL_DIRECCION:}
+    gerente-nombre: ${CHITGO_GERENTE_NOMBRE:}
+    gerente-email: ${CHITGO_GERENTE_EMAIL:}
+    gerente-contrasena: ${CHITGO_GERENTE_CONTRASENA:}
   push:
     habilitado: ${PUSH_HABILITADO:false}
     clave-publica: ${PUSH_CLAVE_PUBLICA:}

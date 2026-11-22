@@ -3,13 +3,17 @@
 spring:
   main:
     banner-mode: off
-  # El script no migra nada: la base ya tiene que estar como la deja el back. Además, sin db/dev en las
-  # locations, Flyway fallaría al validar contra una base que tiene la semilla de dev aplicada.
+  # Flyway migra como al arrancar el back, así el script anda sobre una base recién creada. Solo con
+  # db/migration: no carga ninguna semilla. Para que no falle al validar contra una base que tiene una
+  # semilla aplicada, ignora las migraciones aplicadas que no están en las locations: la R__ de dev
+  # (missing) y la V100 de la demo (future). El valor reemplaza al default (*:future), por eso va también.
   flyway:
-    enabled: false
+    locations: classpath:db/migration
+    ignore-migration-patterns: "*:missing,*:future"
 
 # El back necesita levantar como app web (SecurityConfig pide HttpSecurity), así que el servidor arranca
-# unos segundos, solo en la compu y en un puerto libre, para no chocar con el back si está corriendo.
+# unos segundos, solo en 127.0.0.1 (la compu, o el contenedor con Docker) y en un puerto libre, para no
+# chocar con el back si está corriendo.
 server:
   address: 127.0.0.1
   port: 0
@@ -28,6 +32,3 @@ chitgo:
       habilitada: false
     mesa-sin-mozo:
       habilitada: false
-  script:
-    # Para armar la URL del login del personal que muestra el alta: <url-front>/staff/<token_staff>.
-    url-front: ${URL_FRONT:http://localhost:5173}
