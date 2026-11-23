@@ -17,6 +17,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -36,10 +37,13 @@ import com.chitgo.menu.aplicacion.dto.DatosDePlato;
 import com.chitgo.menu.aplicacion.dto.PlatoAdminDto;
 import com.chitgo.menu.dominio.CategoriaMenu;
 import com.chitgo.menu.dominio.Etiqueta;
+import com.chitgo.menu.dominio.FormatoDeImagen;
 import com.chitgo.menu.dominio.Plato;
 import com.chitgo.menu.dominio.puertos.CategoriaMenuRepository;
 import com.chitgo.menu.dominio.puertos.EtiquetaRepository;
+import com.chitgo.menu.dominio.puertos.ImagenesDePlatos;
 import com.chitgo.menu.dominio.puertos.PlatoRepository;
+import com.chitgo.pruebas.ImagenesDePrueba;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
 class GestionarPlatosServiceTest {
@@ -50,6 +54,7 @@ class GestionarPlatosServiceTest {
     private final PlatoRepository platos = mock(PlatoRepository.class);
     private final CategoriaMenuRepository categorias = mock(CategoriaMenuRepository.class);
     private final EtiquetaRepository etiquetas = mock(EtiquetaRepository.class);
+    private final ImagenesDePlatos imagenes = mock(ImagenesDePlatos.class);
     private final Auditor auditor = mock(Auditor.class);
     private final CategoriaMenu principales = conId(new CategoriaMenu(1L, "Principales", (short) 1), 1L);
     private final CategoriaMenu postres = conId(new CategoriaMenu(1L, "Postres", (short) 2), 2L);
@@ -59,7 +64,7 @@ class GestionarPlatosServiceTest {
 
     @BeforeEach
     void preparar() {
-        servicio = new GestionarPlatosService(platos, categorias, etiquetas, auditor);
+        servicio = new GestionarPlatosService(platos, categorias, etiquetas, imagenes, auditor);
         when(categorias.buscarPorId(1L, 1L)).thenReturn(Optional.of(principales));
         when(categorias.buscarPorId(2L, 1L)).thenReturn(Optional.of(postres));
         // Las del local 1 son Sin TACC y Vegano: cualquier otro id es de otro local o no existe.
@@ -325,7 +330,9 @@ class GestionarPlatosServiceTest {
         assertThrows(AccesoDenegadoException.class, () -> servicio.crear(gerente, milanesaCon("9500")));
         assertThrows(AccesoDenegadoException.class, () -> servicio.editar(gerente, 1L, milanesaCon("9500")));
         assertThrows(AccesoDenegadoException.class, () -> servicio.destacar(gerente, 1L, true));
-        verifyNoInteractions(platos, auditor);
+        assertThrows(AccesoDenegadoException.class,
+                () -> servicio.cambiarImagen(gerente, 1L, ImagenesDePrueba.jpeg(10, 10)));
+        verifyNoInteractions(platos, imagenes, auditor);
     }
 
     @Test
@@ -337,5 +344,142 @@ class GestionarPlatosServiceTest {
         assertNull(valores[1].get("descripcion"));
         assertNull(valores[1].get("imagenUrl"));
         assertEquals(List.of(), valores[1].get("etiquetaIds"));
+    }
+
+    // --- La foto del plato (ST-29)
+
+    private static final String NUEVA = "3f2a1b4c-0000-4000-8000-000000000001.jpg";
+
+    @Test
+    void una_foto_valida_se_guarda_queda_en_la_imagen_del_plato_y_se_audita_como_editar_plato() {
+        Plato milanesa = milanesaEnLaBase();
+        byte[] foto = ImagenesDePrueba.jpeg(40, 20);
+        when(imagenes.guardar(foto, FormatoDeImagen.JPEG)).thenReturn(NUEVA);
+
+        PlatoAdminDto dto = servicio.cambiarImagen(ADMIN, 1L, foto);
+
+        assertEquals("/api/v1/public/imagenes/" + NUEVA, dto.imagenUrl());
+        assertEquals("/api/v1/public/imagenes/" + NUEVA, milanesa.getImagenUrl());
+        verify(platos).guardar(milanesa);
+        Map<String, Object>[] valores = auditado("EDITAR_PLATO", 1L);
+        assertEquals(mapa("imagenUrl", null), valores[0]);
+        assertEquals(mapa("imagenUrl", "/api/v1/public/imagenes/" + NUEVA), valores[1]);
+        verify(imagenes, never()).borrar(any());
+    }
+
+    @Test
+    void un_png_se_guarda_como_png() {
+        milanesaEnLaBase();
+        byte[] foto = ImagenesDePrueba.png(10, 10);
+        when(imagenes.guardar(foto, FormatoDeImagen.PNG)).thenReturn("3f2a1b4c-0000-4000-8000-000000000002.png");
+
+        PlatoAdminDto dto = servicio.cambiarImagen(ADMIN, 1L, foto);
+
+        assertEquals("/api/v1/public/imagenes/3f2a1b4c-0000-4000-8000-000000000002.png", dto.imagenUrl());
+    }
+
+    @Test
+    void reemplazar_una_foto_subida_borra_la_vieja() {
+        Plato milanesa = milanesaEnLaBase();
+        String vieja = "3f2a1b4c-0000-4000-8000-000000000000.jpg";
+        milanesa.cambiarImagen("/api/v1/public/imagenes/" + vieja);
+        when(imagenes.guardar(any(), eq(FormatoDeImagen.JPEG))).thenReturn(NUEVA);
+
+        servicio.cambiarImagen(ADMIN, 1L, ImagenesDePrueba.jpeg(10, 10));
+
+        verify(imagenes).borrar(vieja);
+        Map<String, Object>[] valores = auditado("EDITAR_PLATO", 1L);
+        assertEquals(mapa("imagenUrl", "/api/v1/public/imagenes/" + vieja), valores[0]);
+    }
+
+    @Test
+    void reemplazar_un_link_https_o_una_ruta_del_front_no_borra_nada() {
+        Plato milanesa = milanesaEnLaBase();
+        when(imagenes.guardar(any(), eq(FormatoDeImagen.JPEG))).thenReturn(NUEVA);
+
+        milanesa.cambiarImagen("https://fotos.example.com/milanesa.jpg");
+        servicio.cambiarImagen(ADMIN, 1L, ImagenesDePrueba.jpeg(10, 10));
+        milanesa.cambiarImagen("/img/milanesa.jpg");
+        servicio.cambiarImagen(ADMIN, 1L, ImagenesDePrueba.jpeg(10, 10));
+
+        verify(imagenes, never()).borrar(any());
+    }
+
+    @Test
+    void sin_archivo_es_400_y_no_guarda_nada() {
+        milanesaEnLaBase();
+
+        SolicitudInvalidaException sinNada = assertThrows(SolicitudInvalidaException.class,
+                () -> servicio.cambiarImagen(ADMIN, 1L, null));
+        SolicitudInvalidaException vacio = assertThrows(SolicitudInvalidaException.class,
+                () -> servicio.cambiarImagen(ADMIN, 1L, new byte[0]));
+
+        assertEquals("Elegí una imagen", sinNada.getMessage());
+        assertEquals("Elegí una imagen", vacio.getMessage());
+        verifyNoInteractions(imagenes, auditor);
+        verify(platos, never()).guardar(any());
+    }
+
+    @Test
+    void de_mas_de_3_mb_es_400_y_no_llega_a_guardarse() {
+        milanesaEnLaBase();
+        byte[] grande = new byte[GestionarPlatosService.PESO_MAXIMO + 1];
+        System.arraycopy(ImagenesDePrueba.jpeg(10, 10), 0, grande, 0, 3);
+
+        SolicitudInvalidaException e = assertThrows(SolicitudInvalidaException.class,
+                () -> servicio.cambiarImagen(ADMIN, 1L, grande));
+
+        assertEquals("La imagen pesa más de 3 MB", e.getMessage());
+        verifyNoInteractions(imagenes, auditor);
+    }
+
+    @Test
+    void justo_3_mb_pasa_el_control_del_tamano() {
+        milanesaEnLaBase();
+        byte[] justo = new byte[GestionarPlatosService.PESO_MAXIMO];
+        System.arraycopy(ImagenesDePrueba.jpeg(10, 10), 0, justo, 0, 3);
+        when(imagenes.guardar(justo, FormatoDeImagen.JPEG)).thenReturn(NUEVA);
+
+        servicio.cambiarImagen(ADMIN, 1L, justo);
+
+        verify(imagenes).guardar(justo, FormatoDeImagen.JPEG);
+    }
+
+    @Test
+    void un_texto_renombrado_a_jpg_es_400_y_no_llega_a_guardarse() {
+        Plato milanesa = milanesaEnLaBase();
+        byte[] texto = "no soy una foto".getBytes(StandardCharsets.UTF_8);
+
+        SolicitudInvalidaException e = assertThrows(SolicitudInvalidaException.class,
+                () -> servicio.cambiarImagen(ADMIN, 1L, texto));
+
+        assertEquals("La imagen tiene que ser JPEG o PNG", e.getMessage());
+        assertNull(milanesa.getImagenUrl());
+        verifyNoInteractions(imagenes, auditor);
+    }
+
+    @Test
+    void si_la_imagen_no_se_puede_abrir_el_plato_queda_con_la_foto_de_antes() {
+        Plato milanesa = milanesaEnLaBase();
+        milanesa.cambiarImagen("/img/milanesa.jpg");
+        when(imagenes.guardar(any(), any())).thenThrow(new SolicitudInvalidaException("No se pudo abrir la imagen"));
+
+        assertThrows(SolicitudInvalidaException.class,
+                () -> servicio.cambiarImagen(ADMIN, 1L, ImagenesDePrueba.jpeg(10, 10)));
+
+        assertEquals("/img/milanesa.jpg", milanesa.getImagenUrl());
+        verify(platos, never()).guardar(any());
+        verifyNoInteractions(auditor);
+    }
+
+    @Test
+    void la_foto_de_un_plato_de_otro_local_da_404_y_no_guarda_el_archivo() {
+        when(platos.buscarPorId(50L, 1L)).thenReturn(Optional.empty());
+
+        NoEncontradoException e = assertThrows(NoEncontradoException.class,
+                () -> servicio.cambiarImagen(ADMIN, 50L, ImagenesDePrueba.jpeg(10, 10)));
+
+        assertEquals("El plato no existe", e.getMessage());
+        verifyNoInteractions(imagenes, auditor);
     }
 }

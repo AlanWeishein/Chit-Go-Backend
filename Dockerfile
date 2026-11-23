@@ -20,6 +20,11 @@ RUN groupadd --system chitgo && useradd --system --gid chitgo --no-create-home c
 WORKDIR /app
 COPY --from=build --chown=chitgo:chitgo /build/target/chit-go-back-*.jar app.jar
 
+# Las fotos de los platos (ST-29): /app/imagenes es el ./imagenes por defecto de chitgo.imagenes.carpeta. Se crea
+# acá, con dueño chitgo, porque al montar un volumen vacío Docker le copia la carpeta y su dueño; si no existe,
+# el back no puede escribir y la primera foto falla con "Permission denied".
+RUN mkdir /app/imagenes && chown chitgo:chitgo /app/imagenes
+
 USER chitgo
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -18,10 +18,13 @@ import com.chitgo.compartido.dominio.NoEncontradoException;
 import com.chitgo.menu.aplicacion.dto.DatosDePlato;
 import com.chitgo.menu.aplicacion.dto.PlatoAdminDto;
 import com.chitgo.menu.dominio.CategoriaMenu;
+import com.chitgo.compartido.dominio.SolicitudInvalidaException;
 import com.chitgo.menu.dominio.Etiqueta;
+import com.chitgo.menu.dominio.FormatoDeImagen;
 import com.chitgo.menu.dominio.Plato;
 import com.chitgo.menu.dominio.puertos.CategoriaMenuRepository;
 import com.chitgo.menu.dominio.puertos.EtiquetaRepository;
+import com.chitgo.menu.dominio.puertos.ImagenesDePlatos;
 import com.chitgo.menu.dominio.puertos.PlatoRepository;
 import com.chitgo.usuarios.dominio.UsuarioAutenticado;
 
@@ -36,16 +39,24 @@ public class GestionarPlatosService {
 
     static final String ENTIDAD = "PLATO";
 
+    /** ST-29: hasta 3 MB por foto (17/11). Es el mismo número que spring.servlet.multipart.max-file-size. */
+    static final int PESO_MAXIMO = 3 * 1024 * 1024;
+    static final String SIN_IMAGEN = "Elegí una imagen";
+    static final String PESA_DE_MAS = "La imagen pesa más de 3 MB";
+    static final String FORMATO_DE_IMAGEN_INVALIDO = "La imagen tiene que ser JPEG o PNG";
+
     private final PlatoRepository platos;
     private final CategoriaMenuRepository categorias;
     private final EtiquetaRepository etiquetas;
+    private final ImagenesDePlatos imagenes;
     private final Auditor auditor;
 
     public GestionarPlatosService(PlatoRepository platos, CategoriaMenuRepository categorias,
-            EtiquetaRepository etiquetas, Auditor auditor) {
+            EtiquetaRepository etiquetas, ImagenesDePlatos imagenes, Auditor auditor) {
         this.platos = platos;
         this.categorias = categorias;
         this.etiquetas = etiquetas;
+        this.imagenes = imagenes;
         this.auditor = auditor;
     }
 
@@ -110,6 +121,37 @@ public class GestionarPlatosService {
                 Map.of("destacado", anterior), Map.of("destacado", destacado));
     }
 
+    /**
+     * ST-29: la foto del plato, subida al server. Valida en el orden de la nota: que venga, el tamaño y el formato por
+     * los primeros bytes; el ancho, el alto y que se pueda abrir los mira ImagenesDePlatos. Queda en la auditoría
+     * como un EDITAR_PLATO de imagenUrl, igual que en editar. La foto anterior se borra después del commit si era
+     * una de las guardadas acá; un link https o una ruta del front no se tocan.
+     */
+    @Transactional
+    public PlatoAdminDto cambiarImagen(UsuarioAutenticado usuario, Long platoId, byte[] contenido) {
+        Long localId = localDe(usuario);
+        Plato plato = buscarPlato(platoId, localId);
+        if (contenido == null || contenido.length == 0) {
+            throw new SolicitudInvalidaException(SIN_IMAGEN);
+        }
+        if (contenido.length > PESO_MAXIMO) {
+            throw new SolicitudInvalidaException(PESA_DE_MAS);
+        }
+        FormatoDeImagen formato = FormatoDeImagen.detectar(contenido)
+                .orElseThrow(() -> new SolicitudInvalidaException(FORMATO_DE_IMAGEN_INVALIDO));
+
+        String anterior = plato.getImagenUrl();
+        String nombre = imagenes.guardar(contenido, formato);
+        plato.cambiarImagen(ImagenesDePlatos.RUTA_PUBLICA + nombre);
+        platos.guardar(plato);
+        auditor.registrar(localId, usuario.usuarioId(), "EDITAR_PLATO", ENTIDAD, plato.getId(),
+                soloLaImagen(anterior), soloLaImagen(plato.getImagenUrl()));
+        if (anterior != null && anterior.startsWith(ImagenesDePlatos.RUTA_PUBLICA)) {
+            imagenes.borrar(anterior.substring(ImagenesDePlatos.RUTA_PUBLICA.length()));
+        }
+        return aDto(plato);
+    }
+
     private Plato buscarPlato(Long platoId, Long localId) {
         return platos.buscarPorId(platoId, localId).orElseThrow(() -> new NoEncontradoException("El plato no existe"));
     }
@@ -141,6 +183,13 @@ public class GestionarPlatosService {
                 plato.getPlatoEtiquetas().stream().map(pe -> pe.getId().getEtiquetaId()).sorted().toList());
         valores.put("destacado", plato.isDestacado());
         valores.put("disponible", plato.isActivo());
+        return valores;
+    }
+
+    /** Como el EDITAR_PLATO de editar cuando cambia solo la imagen. La anterior puede ser NULL. */
+    private static Map<String, Object> soloLaImagen(String imagenUrl) {
+        Map<String, Object> valores = new LinkedHashMap<>();
+        valores.put("imagenUrl", imagenUrl);
         return valores;
     }
 
