@@ -18,6 +18,13 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      # La foto de un plato (ST-29): hasta 3 MB, decidido el 17/11. El pedido entero un poco más, por los bytes
+      # del formulario. Si cambia el de 3 MB, cambia también el mensaje de ManejadorDeErrores y el de
+      # GestionarPlatosService.
+      max-file-size: 3MB
+      max-request-size: 4MB
 
 server:
   port: 8080
@@ -26,6 +33,10 @@ chitgo:
   # El front, para armar la URL del login del personal (<url-front>/staff/<token_staff>) que muestran el
   # alta del script y el primer local del .env.
   url-front: ${URL_FRONT:http://localhost:5173}
+  # Las fotos de los platos (ST-29). En la compu, ./imagenes desde donde corre el back (en IntelliJ, la raíz del
+  # repo, que la ignora en el .gitignore); en Docker, la carpeta del volumen.
+  imagenes:
+    carpeta: ${IMAGENES_CARPETA:./imagenes}
   # El primer local y su Gerente/Dueño, creados al arrancar sobre una base sin locales (ST-32). Van las cinco
   # o ninguna: con algunas sí y otras no, el back no arranca. La contraseña es provisoria y nunca va al log.
   # Lo hace PrimerLocalDelEntorno; cómo se usa está en el README, en "Alta de un local".

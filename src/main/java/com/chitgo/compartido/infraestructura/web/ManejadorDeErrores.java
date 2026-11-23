@@ -8,6 +8,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import com.chitgo.compartido.dominio.AccesoDenegadoException;
 import com.chitgo.compartido.dominio.NoEncontradoException;
@@ -25,6 +27,8 @@ public class ManejadorDeErrores {
     static final String SIN_SESION = "No hay una sesión iniciada, o venció.";
     static final String SIN_PERMISO = "No tenés permiso para hacer esto.";
     static final String DATOS_INVALIDOS = "Los datos enviados no son válidos.";
+    /** El tope de spring.servlet.multipart.max-file-size (ST-29). Si cambia uno, cambia el otro. */
+    static final String ARCHIVO_DE_MAS = "La imagen pesa más de 3 MB";
 
     @ExceptionHandler(AuthenticationException.class)
     ProblemDetail sinAutenticar(AuthenticationException e) {
@@ -66,6 +70,21 @@ public class ManejadorDeErrores {
     }
 
     /** Un campo que falta o no tiene el formato (un PIN con letras), o un cuerpo que no es JSON. */
+    /**
+     * Un archivo de más de 3 MB, que Spring corta antes de llegar al controlador. Sería un 413, pero va como 400,
+     * igual que los demás errores de la foto (ST-29).
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ProblemDetail archivoDeMas(MaxUploadSizeExceededException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ARCHIVO_DE_MAS);
+    }
+
+    /** Un multipart mal armado (cortado, sin el boundary). */
+    @ExceptionHandler(MultipartException.class)
+    ProblemDetail multipartInvalido(MultipartException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, DATOS_INVALIDOS);
+    }
+
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
     ProblemDetail datosInvalidos(Exception e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, DATOS_INVALIDOS);

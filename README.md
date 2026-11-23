@@ -24,7 +24,8 @@ El dominio no depende de Spring, JPA ni WebSocket. Los controladores no tienen l
    por defecto de `.env.example`. Variables del back: `DB_URL`, `DB_USER`, `DB_PASSWORD`
    (por defecto `jdbc:mysql://localhost:3307/chitgo`, usuario y clave `chitgo`) y `JWT_CLAVE`, la
    clave para firmar la sesión (sin valor por defecto; si falta, el back usa una al azar y lo avisa
-   en el log, ver `.env.example`).
+   en el log, ver `.env.example`). `IMAGENES_CARPETA` es la carpeta de las fotos de los platos (por
+   defecto `./imagenes`, la raíz del repo si se corre desde IntelliJ; está en el `.gitignore`).
    Para bajarlo: `docker compose down` (con `-v` borra también los datos).
 2. `mvn spring-boot:run -Dspring-boot.run.profiles=dev`
 3. Probar: `GET http://localhost:8080/api/v1/ping`
@@ -33,7 +34,8 @@ El dominio no depende de Spring, JPA ni WebSocket. Los controladores no tienen l
 
 El `Dockerfile` arma la imagen del back en dos etapas: compila el jar con Maven (sin tests, que necesitan
 el MySQL) y lo corre con el JRE 21, con un usuario sin privilegios. El perfil y la base no van fijos en la
-imagen: se pasan con variables de entorno.
+imagen: se pasan con variables de entorno. Las fotos de los platos van a `/app/imagenes`, que la imagen ya
+trae creada con dueño el usuario del contenedor: el compose de la entrega monta ahí un volumen con nombre.
 
 ```
 docker build -t chitgo-back .
@@ -920,9 +922,31 @@ Los cambios no se avisan en vivo: el cliente los ve la próxima vez que carga la
 - **La imagen** es un link `https://...` o una ruta del propio front que empieza con `/` (por ejemplo
   `/img/milanesa.jpg`, en la carpeta `public` del front), de hasta 255 caracteres. `http://` no va, porque el
   navegador la bloquea en una página `https`, y tampoco una ruta que empieza con `//`, que lleva a otro sitio.
-  Vacía o `null` queda sin imagen. No se suben archivos.
+  Vacía o `null` queda sin imagen. Para subir una foto al server, ver "La foto del plato": la ruta que
+  devuelve (`/api/v1/public/imagenes/...`) también vale acá, así que un `PUT` que manda la `imagenUrl` que ya
+  tenía el plato la conserva.
 - El precio vuelve siempre con dos decimales (`1800` queda `1800.00`). Cambiarlo no toca los pedidos que ya
   se mandaron: cada uno guarda el precio del momento.
+
+### La foto del plato
+
+- `POST /api/v1/admin/platos/{id}/imagen`: `multipart/form-data` con el archivo en el campo `imagen` (desde el
+  front, un `FormData`; sin poner el `Content-Type` a mano, que lo arma el navegador con el boundary). Con
+  `X-XSRF-TOKEN`, como los demás. Responde 200 con el plato, como en el `GET`, con la `imagenUrl` nueva:
+  `/api/v1/public/imagenes/<uuid>.jpg` (o `.png`). Queda en la auditoría como un `EDITAR_PLATO` de `imagenUrl`.
+  - Va **JPEG o PNG**, de **hasta 3 MB** y de **hasta 6000 px** de ancho y de alto. El formato se reconoce por
+    los primeros bytes del archivo, no por el nombre. HEIC o WebP del celular hay que convertirlos antes.
+  - El back la vuelve a codificar, así que **se guarda sin metadata** (el EXIF trae la ubicación del celular).
+    Antes la endereza según el EXIF, para que una foto sacada con el celular parado no quede acostada.
+  - Si el plato ya tenía una foto subida, la vieja se borra. Un link `https` o una ruta del front no se tocan.
+  - Errores, todos 400 salvo el 404: "Elegí una imagen" (sin el campo o vacío), "La imagen pesa más de 3 MB",
+    "La imagen tiene que ser JPEG o PNG", "La imagen mide más de 6000 px de ancho o de alto", "No se pudo
+    abrir la imagen" (cortada o dañada) y 404 "El plato no existe".
+- `GET /api/v1/public/imagenes/{nombre}`: la foto, **sin sesión**, para la carta del cliente y la del Admin
+  (sirve en un `<img src>`). Responde con `image/jpeg` o `image/png` y se puede guardar en caché un año: cada
+  foto nueva tiene un nombre nuevo. Solo acepta el nombre que dio el `POST` (un UUID y la extensión); otro nombre
+  o uno que no existe da 404 "La imagen no existe".
+- Las fotos se guardan en la carpeta de `IMAGENES_CARPETA` (ver "Cómo correrlo"); en la base va solo la ruta.
 
 ### Categorías
 
@@ -962,6 +986,7 @@ Los cambios no se avisan en vivo: el cliente los ve la próxima vez que carga la
   ahí. Un cambio que no cambia nada no audita.
 - `CartaDelAdminTest` recorre HU-12 contra el MySQL del Compose (CP-25-01 a CP-25-08, menos CP-25-06, que es de
   la ST-12), con el login del Admin de verdad y la carta del cliente por el QR de la mesa 1.
+- `ImagenDelPlatoTest` sube fotos con el mismo login, contra una carpeta temporal que deja vacía.
 
 ## Empleados (para el front)
 

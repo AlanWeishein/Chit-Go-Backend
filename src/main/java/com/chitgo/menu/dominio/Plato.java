@@ -78,6 +78,11 @@ public class Plato {
         asignar(categoria, nombre, descripcion, precio, imagenUrl);
     }
 
+    /** ST-29: la foto subida al server. Pasa por la misma regla que la imagen de editar; null la saca. */
+    public void cambiarImagen(String imagenUrl) {
+        this.imagenUrl = imagenValida(imagenUrl);
+    }
+
     /** RF-28: los destacados salen arriba en la carta del cliente. */
     public void marcarDestacado(boolean destacado) {
         this.destacado = destacado;
